@@ -2890,6 +2890,23 @@ const LK='salDashPin';
 async function askOld(){const cur=localStorage.getItem(LK);if(!cur)return true;const p=prompt('Enter current PIN');return p!==null&&(await hs(p))===cur;}
 $('pinSet').onclick=async()=>{const p=$('pinNew').value;if(!/^\d{4,}$/.test(p)){alert('PIN must be 4 or more digits.');return;}if(!(await askOld())){alert('Wrong PIN.');return;}localStorage.setItem(LK,await hs(p));$('pinNew').value='';alert('PIN saved.');};
 $('pinOff').onclick=async()=>{if(!(await askOld())){alert('Wrong PIN.');return;}localStorage.removeItem(LK);alert('PIN removed.');};
+/* branding: app name + logo (defaults unchanged: Salary Dashboard + Kashmir Group logo) */
+const BN='salAppName',BL='salAppLogo';
+function applyBrand(){const h1=document.querySelector('header.top h1');if(!h1)return;
+ if(!h1.dataset.origTitle)h1.dataset.origTitle=document.title;
+ const tn=[...h1.childNodes].find(n=>n.nodeType===3&&n.textContent.trim().length>2);
+ if(tn){if(!tn._orig)tn._orig=tn.textContent;const nm=localStorage.getItem(BN);tn.textContent=nm?('💰 '+nm+' '):tn._orig;document.title=nm?(nm+' — Offline'):h1.dataset.origTitle;}
+ const img=$('hdrLogo');
+ if(img){if(!img.dataset.defSrc)img.dataset.defSrc=img.src;const lg=localStorage.getItem(BL);if(lg)img.src=lg;}}
+applyBrand();addEventListener('load',applyBrand);
+if(sp){const bc=document.createElement('div');bc.className='card';
+bc.innerHTML='<h3>🎨 App Name & Logo</h3><div class="controls" style="margin-top:10px"><div class="ctl"><label>App name (header mein)</label><input type="text" id="brandName" placeholder="Salary Dashboard"></div><div class="ctl"><label>&nbsp;</label><button class="btn primary" id="brandSave">✔ Name lagao</button></div><div class="ctl"><label>&nbsp;</label><button class="btn ghost" id="brandLogoBtn">🖼️ Apna logo</button></div><div class="ctl"><label>&nbsp;</label><button class="btn ghost" id="brandReset">↩️ Default (Salary Dashboard + Kashmir logo)</button></div></div><input type="file" id="brandLogoFile" accept="image/*" hidden><p class="hint">Default naam aur logo wohi rahenge — sirf tab badlenge jab aap yahan se change karein. Naam aur logo is device par hi save hote hain.</p>';
+sp.appendChild(bc);
+const bnIn=$('brandName');bnIn.value=localStorage.getItem(BN)||'';
+$('brandSave').onclick=()=>{const v=bnIn.value.trim();if(v)localStorage.setItem(BN,v);else localStorage.removeItem(BN);applyBrand();alert('Name set ho gaya.');};
+$('brandLogoBtn').onclick=()=>$('brandLogoFile').click();
+$('brandLogoFile').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{const im=new Image();im.onload=()=>{const mx=256;const s=Math.min(1,mx/Math.max(im.width,im.height));const cv=document.createElement('canvas');cv.width=Math.round(im.width*s);cv.height=Math.round(im.height*s);cv.getContext('2d').drawImage(im,0,0,cv.width,cv.height);try{localStorage.setItem(BL,cv.toDataURL('image/png'));applyBrand();alert('Logo lag gaya.');}catch(err){alert('Logo bara hai — chhoti image try karein.');}};im.src=r.result;};r.readAsDataURL(f);e.target.value='';};
+$('brandReset').onclick=()=>{localStorage.removeItem(BN);localStorage.removeItem(BL);bnIn.value='';const img=$('hdrLogo');if(img&&img.dataset.defSrc)img.src=img.dataset.defSrc;applyBrand();alert('Default name + logo wapas lag gaya.');};}
 function lock(){if(!localStorage.getItem(LK)||$('pinOv'))return;const d=document.createElement('div');d.id='pinOv';d.style.cssText='position:fixed;inset:0;background:#064e3b;z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;color:#fff;font-family:inherit';
  d.innerHTML='<div style="font-size:46px">🔒</div><h2 style="margin:0">Salary Dashboard is locked</h2><input id="pinIn" type="password" inputmode="numeric" placeholder="Enter PIN" style="padding:12px;border-radius:10px;border:0;font-size:18px;text-align:center"><button class="btn gold" id="pinGo">Unlock</button><div id="pinErr" style="min-height:20px"></div>';document.body.appendChild(d);
  const go=async()=>{if((await hs($('pinIn').value))===localStorage.getItem(LK))d.remove();else{$('pinErr').textContent='Wrong PIN';$('pinIn').value='';}};$('pinGo').onclick=go;$('pinIn').onkeydown=e=>{if(e.key==='Enter')go();};$('pinIn').focus();}
