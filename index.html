@@ -2917,9 +2917,7 @@ const tb=document.createElement('button');tb.className='btn ghost';
 const setT=t=>{root.dataset.theme=t;tb.textContent=t==='dark'?'☀️ Light':'🌙 Dark';try{localStorage.setItem('salDashTheme',t);}catch(e){}};
 let t0='light';try{t0=localStorage.getItem('salDashTheme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');}catch(e){}
 tb.onclick=()=>setT(root.dataset.theme==='dark'?'light':'dark');hctrl.appendChild(tb);setT(t0);
-let dp=null;const ib=document.createElement('button');ib.className='btn ghost';ib.textContent='📲 Install app';hctrl.appendChild(ib);
-addEventListener('beforeinstallprompt',e=>{e.preventDefault();dp=e;});
-ib.onclick=async()=>{if(dp){dp.prompt();dp=null;}else alert('To install: open this app from its https link (GitHub Pages), then use the browser menu → Install app / Add to Home Screen.');};
+/* Install app button: Saadi ki hidayat par REMOVED (2026-10-28) — app ke andar koi install button nahi */
 if('serviceWorker' in navigator&&/^https?:/.test(location.protocol)){navigator.serviceWorker.register('sw.js').catch(()=>{});}
 })();
 </script>
@@ -2941,6 +2939,75 @@ fab.addEventListener('pointermove',e=>{if(!drag)return;const nx=e.clientX-drag.d
 fab.addEventListener('pointerup',()=>{if(drag&&moved){try{localStorage.setItem(KEY,JSON.stringify({x:fab.offsetLeft,y:fab.offsetTop}));}catch(e){}}drag=null;});
 fab.addEventListener('click',e=>{if(moved){e.preventDefault();e.stopImmediatePropagation();moved=false;}},true);
 addEventListener('resize',()=>{if(fab.style.left)place(fab.offsetLeft,fab.offsetTop);});
+})();
+</script>
+
+<style id="mblCss">
+/* ===== Jadogar AI = centered 3D popup (har screen par) ===== */
+#aiDrawer{top:50%!important;left:50%!important;right:auto!important;height:min(680px,92dvh)!important;width:min(540px,94vw)!important;border-radius:22px!important;transform:translate(-50%,-46%) scale(.9)!important;opacity:0;pointer-events:none;transition:transform .3s cubic-bezier(.2,.9,.3,1.25),opacity .25s ease!important;box-shadow:0 30px 90px rgba(0,0,0,.5)!important;overflow:hidden}
+#aiDrawer.open{transform:translate(-50%,-50%) scale(1)!important;opacity:1;pointer-events:auto}
+body.ur #aiDrawer{left:50%!important;right:auto!important;transform:translate(-50%,-46%) scale(.9)!important}
+body.ur #aiDrawer.open{transform:translate(-50%,-50%) scale(1)!important}
+#aiDrawer .ai-head .jstack2{width:76px!important;height:94px!important;flex:0 0 auto}
+#aiDrawer .ai-head .jstack2 img{filter:drop-shadow(0 6px 8px rgba(0,0,0,.35))}
+#aiDrawer.open .ai-head .jstack2{animation:jfloat 3s ease-in-out infinite}
+@keyframes jfloat{0%,100%{transform:translateY(0) rotate(-1.5deg)}50%{transform:translateY(-6px) rotate(1.5deg)}}
+/* ===== Mobile layout ===== */
+@media (max-width:900px){
+ .layout{flex-direction:column!important;gap:10px!important}
+ #sideNav{position:fixed!important;left:0;top:0;height:100dvh!important;max-height:100dvh!important;width:min(300px,85vw)!important;z-index:930;transform:translateX(-107%);transition:transform .3s ease;border-radius:0 16px 16px 0!important;box-shadow:8px 0 30px rgba(0,0,0,.3);flex:none!important}
+ body:not(.navhidden) #sideNav{transform:none}
+ body.ur #sideNav{left:auto;right:0;transform:translateX(107%);border-radius:16px 0 0 16px!important}
+ body.ur:not(.navhidden) #sideNav{transform:none}
+ header.top{padding:12px 12px 42px!important}
+ header.top h1{font-size:19px!important}
+ .hctrl{gap:6px!important}
+ .hctrl .btn{padding:8px 10px!important;font-size:13px!important;min-height:38px}
+ #aiFab{width:82px!important;height:102px!important}
+ .card{padding:12px!important}
+}
+@media (max-width:640px){
+ .kpis{grid-template-columns:repeat(2,1fr)!important;gap:8px!important}
+ .kpi{padding:10px!important}
+ .grid2{grid-template-columns:1fr!important}
+}
+@media (max-height:520px) and (orientation:landscape){
+ header.top{padding:6px 12px 18px!important}
+ header.top p{display:none!important}
+ .kpis{grid-template-columns:repeat(3,1fr)!important;gap:8px!important}
+}
+/* ===== AI Assistant REMOVED (Saadi 2026-10-28): sirf aik robot icon ===== */
+#aiDrawer,#aiBackdrop{display:none!important}
+#aiFab{width:62px!important;height:62px!important;border-radius:50%!important;background:#ffffff!important;box-shadow:0 8px 22px rgba(0,0,0,.28)!important;border:2px solid #065f46!important;display:flex!important;align-items:center;justify-content:center;animation:none!important}
+#aiFab .jstack,#aiFab .sparkle{display:none!important}
+#aiFab::after,#aiFab::before{display:none!important;content:none!important}
+/* ===== Mobile hero cards fix (3 bari cards ki wajah se page chaura ho raha tha) ===== */
+@media (max-width:900px){
+ .layout{align-items:stretch!important}
+ .hero{display:grid!important;grid-template-columns:1fr 1fr;gap:8px!important;width:100%!important}
+ .hcard{min-width:0!important;width:auto!important;overflow:hidden}
+ .hcard:last-child{grid-column:span 2}
+ .hcap,.hsub{white-space:normal!important}
+ .hval{font-size:19px!important;white-space:normal!important;overflow-wrap:anywhere}
+ .content{min-width:0!important;width:100%!important;max-width:100%!important}
+ .layout>*{min-width:0!important}
+}
+@media (max-height:520px) and (orientation:landscape){
+ .hctrl{flex-wrap:nowrap!important;overflow-x:auto;padding-bottom:4px}
+ .hctrl .btn{padding:6px 9px!important;font-size:12.5px!important;min-height:32px!important;white-space:nowrap}
+ header.top h1{font-size:17px!important}
+ #hdrLogo{height:30px!important}
+}
+</style>
+<script>
+(function(){
+ /* robot icon: purana Jadogar button hata kar saaf robot button */
+ const _fab=document.getElementById('aiFab');
+ if(_fab){const nf=document.createElement('button');nf.id='aiFab';nf.title='Robot';nf.innerHTML='<span style="font-size:34px;line-height:1">\u{1F916}</span>';_fab.replaceWith(nf);}
+ function mob(){return matchMedia('(max-width:900px)').matches;}
+ if(mob())document.body.classList.add('navhidden');
+ document.querySelectorAll('#sideNav .vtab').forEach(b=>b.addEventListener('click',()=>{if(mob())document.body.classList.add('navhidden');}));
+ document.addEventListener('click',e=>{if(mob()&&!document.body.classList.contains('navhidden')&&!e.target.closest('#sideNav')&&!e.target.closest('#navBtn'))document.body.classList.add('navhidden');});
 })();
 </script>
 </body>
