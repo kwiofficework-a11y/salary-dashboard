@@ -2950,8 +2950,8 @@ body.ur #aiDrawer{left:50%!important;right:auto!important;transform:translate(-5
 body.ur #aiDrawer.open{transform:translate(-50%,-50%) scale(1)!important}
 #aiDrawer .ai-head .jstack2{width:76px!important;height:94px!important;flex:0 0 auto}
 #aiDrawer .ai-head .jstack2 img{filter:drop-shadow(0 6px 8px rgba(0,0,0,.35))}
-#aiDrawer.open .ai-head .jstack2{animation:jfloat 3s ease-in-out infinite}
-@keyframes jfloat{0%,100%{transform:translateY(0) rotate(-1.5deg)}50%{transform:translateY(-6px) rotate(1.5deg)}}
+#aiDrawer .ai-head .jstack2{animation:none!important}
+#aiDrawer .ai-head .jstack2 img{animation:none!important}
 /* ===== Mobile layout ===== */
 @media (max-width:900px){
  .layout{flex-direction:column!important;gap:10px!important}
@@ -2976,8 +2976,7 @@ body.ur #aiDrawer.open{transform:translate(-50%,-50%) scale(1)!important}
  header.top p{display:none!important}
  .kpis{grid-template-columns:repeat(3,1fr)!important;gap:8px!important}
 }
-/* ===== AI Assistant REMOVED (Saadi 2026-10-28): sirf aik robot icon ===== */
-#aiDrawer,#aiBackdrop{display:none!important}
+/* ===== AI Assistant: robot icon, koi animation nahi, popup style (Saadi 2026-10-28) ===== */
 #aiFab{width:62px!important;height:62px!important;border-radius:50%!important;background:#ffffff!important;box-shadow:0 8px 22px rgba(0,0,0,.28)!important;border:2px solid #065f46!important;display:flex!important;align-items:center;justify-content:center;animation:none!important}
 #aiFab .jstack,#aiFab .sparkle{display:none!important}
 #aiFab::after,#aiFab::before{display:none!important;content:none!important}
@@ -3001,9 +3000,52 @@ body.ur #aiDrawer.open{transform:translate(-50%,-50%) scale(1)!important}
 </style>
 <script>
 (function(){
- /* robot icon: purana Jadogar button hata kar saaf robot button */
+ /* robot icon: purana Jadogar button hata kar saaf robot button — click par AI Assistant popup */
  const _fab=document.getElementById('aiFab');
- if(_fab){const nf=document.createElement('button');nf.id='aiFab';nf.title='Robot';nf.innerHTML='<span style="font-size:34px;line-height:1">\u{1F916}</span>';_fab.replaceWith(nf);}
+ if(_fab){const nf=document.createElement('button');nf.id='aiFab';nf.title='AI Assistant';nf.innerHTML='<span style="font-size:34px;line-height:1">\u{1F916}</span>';nf.addEventListener('click',()=>{if(typeof openAI==='function')openAI();});_fab.replaceWith(nf);}
+ /* assistant header: animated Jadogar hata kar static robot + saaf title */
+ const _js=document.querySelector('#aiDrawer .jstack2');
+ if(_js)_js.innerHTML='<span style="font-size:42px;line-height:1">\u{1F916}</span>';
+ [...document.querySelectorAll('.ai-head *')].forEach(e=>{if(e.children.length===0&&/Jadogar|جادوگر/.test(e.textContent))e.textContent='\u{1F916} AI Assistant';});
+ /* ===== Powerful engine: worker lookup, top-N lists, dept compare, ranges, canteen workers ===== */
+ function workerCard(w){const M=n=>'Rs '+fmt(n);const tr=(a,b)=>'<tr><td style="padding:4px 6px;border-bottom:1px solid #eee">'+a+'</td><td style="padding:4px 6px;border-bottom:1px solid #eee;text-align:right"><b>'+b+'</b></td></tr>';
+  return '<b>'+esc(w.name)+'</b> — '+esc(w.dept)+' · '+esc(w.desig||'')+'<table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:6px">'+tr('Code',esc(w.code||'—'))+tr('Gross',M(w.gross))+tr('Net Payable',M(w.net))+tr('Paid',M(w.paid))+tr('Unpaid',M(w.unpaid))+tr('Advance (total)',M(w.totAdv))+tr('OT',fmt(w.otH)+' hrs · '+M(w.otAmt))+tr('Mess Allowance',M(w.mess))+tr('Canteen Deduction',M(w.canteen))+tr('Days',fmt(w.days))+'</table>';}
+ function myEngine(raw){
+  try{
+   if(typeof W==='undefined'||!W.length)return null;
+   const q=' '+String(raw).toLowerCase().replace(/[?؟!]/g,' ')+' ';
+   const M=n=>'Rs '+fmt(n);const has=(...ws)=>ws.some(w=>q.includes(w));
+   const D=groupAgg(w=>w.dept);
+   const tr=(a,b)=>'<tr><td style="padding:4px 6px;border-bottom:1px solid #eee">'+a+'</td><td style="padding:4px 6px;border-bottom:1px solid #eee;text-align:right"><b>'+b+'</b></td></tr>';
+   const tbl=r=>'<table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:6px">'+r+'</table>';
+   let cm=q.match(/code\s*(\d+)/)||q.match(/\b(0{2,}\d{2,6})\b/);
+   if(cm){const w=W.find(x=>String(x.code||'').replace(/^0+/,'')===cm[1].replace(/^0+/,'')&&cm[1].replace(/^0+/,'')!=='');if(w)return workerCard(w);}
+   const cand=W.filter(x=>x.name&&x.name.length>3&&q.includes(' '+x.name.toLowerCase()+' '));
+   if(cand.length){cand.sort((a,b)=>b.name.length-a.name.length);const w=cand[0];const same=W.filter(x=>x.name===w.name).length;return (same>1?'<i>Note: is naam ke '+same+' workers hain — pehla dikhaya gaya hai. Code likh kar poochein to exact milega.</i><br>':'')+workerCard(w);}
+   let tm=q.match(/top\s*(\d+)/);
+   let N=tm?Math.min(25,parseInt(tm[1])):0;
+   if(!N&&has('top','sab se zyada wale')&&has('list','workers','bande','batao'))N=10;
+   if(N){let key='net',label='Net Salary';
+    if(has('advance')){key='totAdv';label='Advance';}
+    else if(has(' ot','overtime')){key='otAmt';label='OT Amount';}
+    else if(has('unpaid')){key='unpaid';label='Unpaid';}
+    else if(has('paid')){key='paid';label='Paid';}
+    else if(has('din','days','hazri')){key='days';label='Days';}
+    const rows=W.filter(w=>w[key]>0).sort((a,b)=>b[key]-a[key]).slice(0,N).map((w,i)=>tr((i+1)+'. '+esc(w.name)+' <span style="color:#888">('+esc(w.dept)+')</span>',key==='days'?fmt(w.days):M(w[key]))).join('');
+    if(rows)return '<b>Top '+N+' — '+label+'</b>'+tbl(rows);}
+   const found=D.filter(g=>q.includes(g.key.toLowerCase()));
+   if(found.length>=2&&has(' vs ','compare','muqabla','farq','difference')){const a=found[0],b=found[1];
+    return '<b>'+esc(a.key)+' vs '+esc(b.key)+'</b>'+tbl(tr('Workers',a.n+' vs '+b.n)+tr('Net',M(a.net)+' vs '+M(b.net))+tr('Paid',M(a.paid)+' vs '+M(b.paid))+tr('Unpaid',M(a.unpaid)+' vs '+M(b.unpaid))+tr('Advance',M(a.totAdv)+' vs '+M(b.totAdv))+tr('OT',M(a.otAmt)+' vs '+M(b.otAmt)));}
+   let rm=q.match(/(\d[\d,]*)\s*(?:se|to|-|–|tak)\s*(\d[\d,]*)/);
+   if(rm&&has('salary','net','tankhwah','workers','kitne','bande')){let lo=+rm[1].replace(/,/g,''),hi=+rm[2].replace(/,/g,'');if(lo>hi){const t2=lo;lo=hi;hi=t2;}const c=W.filter(w=>w.net>=lo&&w.net<=hi);return '<b>'+M(lo)+' se '+M(hi)+'</b> ke darmiyan Net salary wale workers: <b>'+c.length+'</b>';}
+   const cans=[['ahmad baksh','can1','Ahmad Baksh'],['shahzad','can2','Sh. Shahzad'],['murtaza','can3','Murtaza'],['shakeel','can4','Shakeel']];
+   for(const [nm,k,label] of cans){if(q.includes(nm)&&has('canteen','کینٹین')){const ws=W.filter(w=>w[k]>0);const tot=ws.reduce((a,w)=>a+w[k],0);return '<b>'+label+' Canteen</b>: '+ws.length+' workers · Total deduction <b>'+M(tot)+'</b>';}}
+   if(has('sab se zyada')&&has('unpaid')&&has('worker','banda','kis')){const w=W.filter(x=>x.unpaid>0).sort((a,b)=>b.unpaid-a.unpaid)[0];if(w)return 'Sab se zyada Unpaid: <b>'+esc(w.name)+'</b> ('+esc(w.dept)+') — <b>'+M(w.unpaid)+'</b>';}
+   if(has('sab se zyada')&&has('advance')&&has('kis','worker','banda')){const w=W.filter(x=>x.totAdv>0).sort((a,b)=>b.totAdv-a.totAdv)[0];if(w)return 'Sab se zyada Advance: <b>'+esc(w.name)+'</b> ('+esc(w.dept)+') — <b>'+M(w.totAdv)+'</b>';}
+  }catch(e){return null;}
+  return null;}
+ if(typeof answerQuestion==='function'){const _origAQ=answerQuestion;answerQuestion=function(raw){const mine=myEngine(raw);if(mine)return mine;return _origAQ(raw);};}
+
  function mob(){return matchMedia('(max-width:900px)').matches;}
  if(mob())document.body.classList.add('navhidden');
  document.querySelectorAll('#sideNav .vtab').forEach(b=>b.addEventListener('click',()=>{if(mob())document.body.classList.add('navhidden');}));
