@@ -3456,10 +3456,10 @@ renderBar();
   +'html[data-theme="dark"] select option{background:#0f172a;color:#f1f5f9}'
   /* sidebar tabs: modern golden hover — gradient + kinare par gold line + halka slide, text pure safed */
   +'html[data-theme="dark"] #sideNav .vtab{transition:background .18s ease,transform .18s ease,box-shadow .18s ease,color .18s ease,border-color .18s ease}'
-  +'html[data-theme="dark"] #sideNav .vtab:hover{background:linear-gradient(90deg,rgba(184,134,11,.30),rgba(184,134,11,.06))!important;border-color:rgba(184,134,11,.55)!important;color:#ffffff!important;box-shadow:inset 3px 0 0 #b8860b;transform:translateX(3px)}'
+  +'html[data-theme="dark"] #sideNav .vtab:hover{background:linear-gradient(90deg,rgba(var(--gold-rgb,184,134,11),.30),rgba(var(--gold-rgb,184,134,11),.06))!important;border-color:rgba(var(--gold-rgb,184,134,11),.55)!important;color:#ffffff!important;box-shadow:inset 3px 0 0 rgb(var(--gold-rgb,184,134,11));transform:translateX(3px)}'
   +'html.ur[data-theme="dark"] #sideNav .vtab:hover,body.ur[data-theme="dark"] #sideNav .vtab:hover{box-shadow:inset -3px 0 0 #b8860b;transform:translateX(-3px)}'
   /* flat table ki row hover bhi dark mein parhne yog */
-  +'html[data-theme="dark"] #sheetTbl tr:hover td{background:rgba(184,134,11,.14)!important;color:#f8fafc!important}'
+  +'html[data-theme="dark"] #sheetTbl tr:hover td{background:rgba(var(--gold-rgb,184,134,11),.14)!important;color:#f8fafc!important}'
   +'html[data-theme="dark"] details.dblock summary:hover{background:#263449!important}'
   /* upar wale view tabs (pills) dark mein */
   +'html[data-theme="dark"] .vtabs .vtab{background:#1e293b!important;color:#e5e7eb!important;border-color:#334155!important}'
@@ -3474,7 +3474,22 @@ renderBar();
   +'html[data-theme="dark"] #fileBanner{background:#0f172a!important;color:#e5e7eb!important;border-color:#334155!important}'
   +'html[data-theme="dark"] .btn:hover{filter:brightness(1.09)}'
   /* Settings khula ho to neeche wala dashboard/reports nahi dikhte — settings apni puri screen */
-  +'body.settings-open .wrap:not(#settingsPanel){display:none!important}';
+  +'body.settings-open .wrap:not(#settingsPanel){display:none!important}'
+  /* ===== Dynamic pack ki styles (suggestions 1-5) ===== */
+  +'#fileInfoBar{border-inline-start:5px solid rgb(var(--gold-rgb,184,134,11))}'
+  +'#stickyTotals{position:fixed;top:0;left:0;right:0;z-index:900;background:var(--card);color:var(--ink);border-bottom:3px solid rgb(var(--gold-rgb,184,134,11));box-shadow:0 6px 18px rgba(0,0,0,.18);padding:7px 14px;display:flex;gap:8px 18px;flex-wrap:wrap;align-items:center;font-size:13.5px;transform:translateY(-110%);transition:transform .25s ease;pointer-events:none}'
+  +'#stickyTotals.show{transform:translateY(0)}'
+  +'html.aasan body{font-size:17px}'
+  +'html.aasan table{font-size:15px!important}'
+  +'html.aasan .kpi .val{font-size:27px}'
+  +'html.aasan .kpi .cap,html.aasan .hero .hcap{font-size:14px}'
+  +'html.aasan .hero .hval{font-size:38px}'
+  +'html.aasan .btn{font-size:15.5px;padding:12px 17px}'
+  +'html.aasan .ctl label{font-size:13.5px}'
+  +'html.aasan #sideNav .vtab{font-size:15px;padding:11px 12px}'
+  +'html.aasan .hint{font-size:14px;line-height:1.75}'
+  +'html.aasan input,html.aasan select{font-size:15px!important}'
+  +'html.aasan #aiMBody{font-size:16px}';
   document.head.appendChild(st);
   const p=$('settingsPanel');
   if(p){
@@ -3482,6 +3497,141 @@ renderBar();
     new MutationObserver(sync).observe(p,{attributes:true,attributeFilter:['style']});
     sync();
   }
+})();
+/* ---------- Dynamic pack: Saadi ki 5 dynamic suggestions (2026-10-29) ----------
+   1) Aasan Nazar mode  2) Accent rang picker  3) Department search  4) Sticky totals patti  5) Dashboard layout */
+(function(){
+  const root=document.documentElement;
+  /* (#2) Accent rang — hover/highlight ka rang (CSS var --gold-rgb) */
+  const ACC_KEY='salAccent';
+  function applyAccent(rgb){ if(rgb)root.style.setProperty('--gold-rgb',rgb); else root.style.removeProperty('--gold-rgb'); }
+  let accSaved=null; try{accSaved=localStorage.getItem(ACC_KEY);}catch(e){}
+  if(accSaved)applyAccent(accSaved);
+  const sp2=$('settingsPanel');
+  if(sp2){
+    const card=document.createElement('div'); card.className='card'; card.id='accentCard';
+    card.innerHTML='<h3>🎨 Rang — Accent (hover / highlight ka rang)</h3><div style="display:flex;gap:9px;flex-wrap:wrap;margin-top:6px">'
+      +[['184,134,11','🟡 Gold (default)'],['37,99,235','🔵 Neela'],['5,150,105','🟢 Sabz'],['185,28,28','🔴 Maroon'],['124,58,237','🟣 Purple']].map(function(x){return '<button class="btn ghost accSw" data-rgb="'+x[0]+'">'+x[1]+'</button>';}).join('')
+      +'</div><p class="hint">Jo rang chunein ge, sidebar tabs ke hover effect, sticky totals patti aur dashboard patti ki kinari usi rang mein ho jayegi. Choice is device par yaad rahegi.</p>';
+    sp2.appendChild(card);
+    const mark=()=>{let cur='184,134,11'; try{cur=localStorage.getItem(ACC_KEY)||cur;}catch(e){} card.querySelectorAll('.accSw').forEach(b=>{b.style.outline=(b.dataset.rgb===cur)?'3px solid rgb('+b.dataset.rgb+')':'none';});};
+    card.querySelectorAll('.accSw').forEach(b=>{b.onclick=()=>{try{localStorage.setItem(ACC_KEY,b.dataset.rgb);}catch(e){} applyAccent(b.dataset.rgb); mark();};});
+    mark();
+  }
+  /* (#1) Aasan Nazar mode — bara font, saaf text */
+  const AA_KEY='salAasan';
+  const hctrl=document.querySelector('.hctrl');
+  if(hctrl){
+    const b=document.createElement('button'); b.className='btn ghost'; b.id='aasanBtn'; b.textContent='👁️ Aasan Nazar';
+    b.title='Bara font + saaf text on/off';
+    const syncA=()=>{let on=false; try{on=localStorage.getItem(AA_KEY)==='1';}catch(e){} root.classList.toggle('aasan',on); b.classList.toggle('gold',on); b.classList.toggle('ghost',!on);};
+    b.onclick=()=>{let cur=false; try{cur=localStorage.getItem(AA_KEY)==='1'; localStorage.setItem(AA_KEY,cur?'0':'1');}catch(e){} syncA();};
+    hctrl.appendChild(b); syncA();
+  }
+  /* (#3) Department search — lambi list mein type karke dhundna */
+  const dsel=$('deptFilter');
+  if(dsel){
+    const inp=document.createElement('input'); inp.id='deptSearch'; inp.type='text'; inp.placeholder='🔍 Department dhundein…';
+    inp.style.cssText='width:100%;padding:8px;border:1.5px solid var(--line);border-radius:9px;font-family:inherit;font-size:13.5px;margin-bottom:6px;background:var(--card);color:var(--ink)';
+    dsel.parentNode.insertBefore(inp,dsel);
+    let allOpts=null;
+    const snap=()=>{ allOpts=[...dsel.options].map(o=>({v:o.value,t:o.textContent})); };
+    snap();
+    const obs=new MutationObserver(()=>{ snap(); if(inp.value)doFilter(); });
+    obs.observe(dsel,{childList:true});
+    function doFilter(){
+      if(!allOpts)return;
+      const q=inp.value.trim().toLowerCase(); const cur=dsel.value;
+      const list=allOpts.filter(o=>!o.v||o.t.toLowerCase().includes(q));
+      if(cur&&!list.some(o=>o.v===cur)){const co=allOpts.find(o=>o.v===cur); if(co)list.push(co);}
+      obs.disconnect();
+      dsel.innerHTML=list.map(o=>'<option value="'+String(o.v).replace(/"/g,'&quot;')+'">'+String(o.t).replace(/</g,'&lt;')+'</option>').join('');
+      dsel.value=list.some(o=>o.v===cur)?cur:(list.length?list[0].v:'');
+      obs.observe(dsel,{childList:true});
+    }
+    inp.addEventListener('input',doFilter);
+  }
+  /* (#4) Sticky totals patti — scroll par upar chipki hui */
+  const sbar=document.createElement('div'); sbar.id='stickyTotals';
+  document.body.appendChild(sbar);
+  function updSticky(){
+    const has=(typeof W!=='undefined'&&W&&W.length>0);
+    const locked=!!document.getElementById('pinOv');
+    const show=has&&!locked&&!document.body.classList.contains('settings-open')&&window.scrollY>340;
+    sbar.classList.toggle('show',!!show);
+    if(show&&typeof totals==='function'&&typeof fmtM==='function'){
+      const t=totals(W);
+      let nm=''; try{const fi=JSON.parse(localStorage.getItem('salFileInfo')||'null'); if(fi&&fi.name)nm=fi.name;}catch(e){}
+      sbar.innerHTML='<b>📊 '+(nm?String(nm).replace(/</g,'&lt;')+' · ':'')+'</b><span>💼 Gross: <b>'+fmtM(t.gross)+'</b></span><span>🧾 Net: <b>'+fmtM(t.net)+'</b></span><span>✅ Paid: <b>'+fmtM(t.paid)+'</b></span><span>⏳ Unpaid: <b>'+fmtM(t.unpaid)+'</b></span>';
+    }
+  }
+  addEventListener('scroll',updSticky,{passive:true});
+  setInterval(updSticky,1500);
+  /* (#5) Dashboard layout — cards ki tartib + hide/show (choice yaad) */
+  const LKEY='salLayoutV1';
+  const loadL=()=>{try{return JSON.parse(localStorage.getItem(LKEY)||'{}');}catch(e){return{};}};
+  const saveL=o=>{try{localStorage.setItem(LKEY,JSON.stringify(o));}catch(e){}};
+  function cardsOf(box){ return box?[...box.children].filter(el=>el.querySelector&&el.querySelector('.hcap,.cap')):[]; }
+  function capOf(el){ const c=el.querySelector('.hcap,.cap'); return c?c.textContent.trim():''; }
+  function applyLayout(){
+    const L=loadL(); const order=L.order||[], hidden=L.hidden||[];
+    ['heroMain','kpis'].forEach(id=>{
+      const box=$(id); if(!box)return;
+      const cards=cardsOf(box); if(!cards.length)return;
+      const sorted=[...cards].sort((a,b)=>{
+        const ia=order.indexOf(capOf(a)), ib=order.indexOf(capOf(b));
+        return (ia<0?999:ia)-(ib<0?999:ib);
+      });
+      sorted.forEach(c=>box.appendChild(c));
+      cards.forEach(c=>{c.style.display=hidden.includes(capOf(c))?'none':'';});
+    });
+  }
+  if(typeof renderDash==='function'){
+    const _rd=renderDash;
+    renderDash=function(){const r=_rd.apply(this,arguments); try{applyLayout();}catch(e){} return r;};
+  }
+  applyLayout();
+  if(sp2){
+    const lc=document.createElement('div'); lc.className='card'; lc.id='layoutCard';
+    lc.innerHTML='<h3>🧩 Dashboard Layout — cards ki tartib / hide</h3><div id="layoutList"></div><p class="hint">Checkbox band karne se card dashboard se chhup jayega; ↑ ↓ se tartib badlein. Choice is device par yaad rahegi. Card ke naam maujooda language mein hain — language badalne par layout default ho sakta hai.</p>';
+    sp2.appendChild(lc);
+    const buildList=()=>{
+      const box=$('layoutList'); if(!box)return;
+      const L=loadL(); const hidden=L.hidden||[];
+      const items=[];
+      ['heroMain','kpis'].forEach(id=>{const bx=$(id); if(bx)cardsOf(bx).forEach(c=>items.push(capOf(c)));});
+      const uniq=[...new Set(items)];
+      const ord=L.order||[];
+      uniq.sort((a,b)=>(ord.indexOf(a)<0?999:ord.indexOf(a))-(ord.indexOf(b)<0?999:ord.indexOf(b)));
+      box.innerHTML=uniq.map(cap=>'<div style="display:flex;gap:8px;align-items:center;padding:5px 0;border-bottom:1px dashed var(--line)"><label style="flex:1;display:flex;gap:7px;align-items:center;font-size:14px"><input type="checkbox" class="layShow" data-cap="'+cap.replace(/"/g,'&quot;')+'" '+(hidden.includes(cap)?'':'checked')+'> '+cap.replace(/</g,'&lt;')+'</label><button class="btn ghost layUp" data-cap="'+cap.replace(/"/g,'&quot;')+'" style="padding:4px 10px">↑</button><button class="btn ghost layDn" data-cap="'+cap.replace(/"/g,'&quot;')+'" style="padding:4px 10px">↓</button></div>').join('')||'<p class="hint">Pehle salary sheet load karein — phir cards yahan ayenge.</p>';
+      const commit=(o,h)=>{saveL({order:o,hidden:h}); applyLayout(); buildList();};
+      box.querySelectorAll('.layShow').forEach(cb=>{cb.onchange=()=>{const L2=loadL(); const h=new Set(L2.hidden||[]); if(cb.checked)h.delete(cb.dataset.cap); else h.add(cb.dataset.cap); commit(L2.order||uniq,[...h]);};});
+      box.querySelectorAll('.layUp').forEach(bt=>{bt.onclick=()=>{const L2=loadL(); const cur=(L2.order&&L2.order.length)?[...L2.order]:[...uniq]; const i=cur.indexOf(bt.dataset.cap); if(i>0){cur.splice(i,1); cur.splice(i-1,0,bt.dataset.cap); commit(cur,L2.hidden||[]);}};});
+      box.querySelectorAll('.layDn').forEach(bt=>{bt.onclick=()=>{const L2=loadL(); const cur=(L2.order&&L2.order.length)?[...L2.order]:[...uniq]; const i=cur.indexOf(bt.dataset.cap); if(i>=0&&i<cur.length-1){cur.splice(i,1); cur.splice(i+1,0,bt.dataset.cap); commit(cur,L2.hidden||[]);}};});
+    };
+    buildList();
+    new MutationObserver(()=>{if(sp2.style.display!=='none')buildList();}).observe(sp2,{attributes:true,attributeFilter:['style']});
+  }
+  /* (#6) Har report par apne Print / PDF / Excel buttons (Saadi, 2026-10-29 — isi deploy mein) */
+  document.querySelectorAll('section[id^="view-"]').forEach(sec=>{
+    const name=sec.id.replace('view-','');
+    if(name==='assistant'||name==='dash')return;
+    const bar=document.createElement('div'); bar.className='repTools'; bar.dataset.view=name;
+    bar.style.cssText='display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;margin:0 0 12px';
+    bar.innerHTML='<button class="btn gold rtP">🖨️ Print</button><button class="btn gold rtPdf">📄 PDF</button><button class="btn primary rtX">📊 Excel</button>';
+    sec.insertBefore(bar,sec.firstChild);
+    const go=fn=>()=>{
+      if(typeof view!=='undefined'&&view===name){fn();}
+      else if(typeof showView==='function'){showView(name); setTimeout(fn,300);}
+      else fn();
+    };
+    bar.querySelector('.rtP').onclick=go(()=>{if(typeof doPrint==='function')doPrint();});
+    bar.querySelector('.rtPdf').onclick=go(()=>{if(typeof doPrint==='function')doPrint();});
+    bar.querySelector('.rtX').onclick=go(()=>{if(typeof doExcel==='function')doExcel();});
+  });
+  const syncRepBtns=()=>{const has=(typeof W!=='undefined'&&W&&W.length>0); document.querySelectorAll('.repTools button').forEach(b=>b.disabled=!has);};
+  syncRepBtns(); setInterval(syncRepBtns,1500);
+  window.SalDynamic={applyLayout: applyLayout, updSticky: updSticky};
 })();
 window.SalFolder={syncNow: syncNow, connect: connect, remove: removeFolder};
 })();
