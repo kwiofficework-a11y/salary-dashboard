@@ -3165,6 +3165,8 @@ if(sp){
     +'<div class="ctl"><label>&nbsp;</label><button class="btn primary" id="fsConn">📁 Folder jodein / badlein</button></div>'
     +'<div class="ctl"><label>&nbsp;</label><button class="btn gold" id="fsSync">🔄 Sync Now</button></div>'
     +'<div class="ctl"><label>Folder ki sheets — ghalat pick ho to yahan se badlein</label><select id="fsPick" style="max-width:100%"><option value="">🔄 Auto — sab se nayi file</option></select></div>'
+    +'<div class="ctl"><label>📦 Archive folder (purane mahine)</label><button class="btn ghost" id="fsArcConn">📦 Archive jodein / badlein</button></div>'
+    +'<div class="ctl"><label>Archive ki sheets — chunne par load ho jayegi</label><select id="fsArcPick" style="max-width:100%"><option value="">📦 Archive se sheet chunein…</option></select></div>'
     +'<div class="ctl"><label>&nbsp;</label><button class="btn ghost" id="fsRemove">Folder hatayein</button></div>'
     +'<div class="ctl"><label>Auto-sync</label><label style="display:flex;gap:6px;align-items:center;font-size:14px"><input type="checkbox" id="fsAuto" checked> App khulte hi sync</label></div>'
     +'</div>'
@@ -3177,9 +3179,11 @@ if(sp){
   $('fsSync').onclick=()=>syncNow();
   $('fsRemove').onclick=removeFolder;
   $('fsPick').onchange=onPickChange;
+  $('fsArcConn').onclick=arcConnect;
+  $('fsArcPick').onchange=arcPickChange;
   if(!supported){
     stEl.innerHTML='⚠️ Is browser/mobile mein folder sync nahi chalta — PC par <b>Chrome ya Edge</b> use karein. File select wala purana tareeqa har jagah chalta rahega.';
-    $('fsConn').disabled=true; $('fsSync').disabled=true; $('fsPick').disabled=true;
+    $('fsConn').disabled=true; $('fsSync').disabled=true; $('fsPick').disabled=true; $('fsArcConn').disabled=true; $('fsArcPick').disabled=true;
   }
 }
 const status=t=>{if(stEl)stEl.innerHTML=t};
@@ -3206,9 +3210,9 @@ async function ensurePerm(ask){
 const LS_PICK='salFolderPick';
 const pickName=()=>{try{return localStorage.getItem(LS_PICK)||''}catch(e){return ''}};
 const setPick=n=>{try{if(n)localStorage.setItem(LS_PICK,n);else localStorage.removeItem(LS_PICK)}catch(e){}};
-async function listFiles(){
+async function listFrom(handle){
   const out=[];
-  for await(const h of dirHandle.values()){
+  for await(const h of handle.values()){
     if(!h||h.kind!=='file')continue;
     const n=h.name||'';
     if(n.indexOf('~$')===0)continue;                 /* Excel ki lock file skip */
@@ -3217,6 +3221,55 @@ async function listFiles(){
   }
   out.sort((a,b)=>b.lastModified-a.lastModified);    /* sab se nayi pehle */
   return out;
+}
+async function listFiles(){return listFrom(dirHandle);}
+/* ---------- Archive folder: purane mahinon ki sheets (Saadi suggestion #2, 2026-10-29) ---------- */
+let arcHandle=null;
+async function loadArcHandle(){
+  if(window.__SAL_DIR2__){arcHandle=window.__SAL_DIR2__;return arcHandle;}
+  try{arcHandle=(typeof idbGet==='function')?(await idbGet('dirHandle2'))||null:null;}catch(e){arcHandle=null;}
+  return arcHandle;
+}
+async function saveArcHandle(){
+  if(window.__SAL_DIR2__)return;
+  try{
+    if(arcHandle&&typeof idbSet==='function')await idbSet('dirHandle2',arcHandle);
+    else if(typeof idbDel==='function')idbDel('dirHandle2');
+  }catch(e){}
+}
+function fillArc(files){
+  const sel=$('fsArcPick'); if(!sel)return;
+  sel.innerHTML='<option value="">📦 Archive se sheet chunein…</option>'+files.map(f=>'<option value="'+f.name.replace(/"/g,'&quot;')+'">'+f.name.replace(/</g,'&lt;')+' · '+fmtDT(f.lastModified)+'</option>').join('');
+}
+async function arcConnect(){
+  if(!supported)return;
+  try{
+    const h=await window.showDirectoryPicker({mode:'read'});
+    arcHandle=h; await saveArcHandle();
+    fillArc(await listFrom(arcHandle));
+    status('✅ Archive folder jud gaya: <b>'+(h.name||'')+'</b> — ab Archive drop-down se koi bhi purani sheet kholein. Is mahine par wapas ane ke liye Sync Now dabayein.');
+  }catch(e){/* user ne picker cancel kar diya */}
+}
+async function arcPickChange(){
+  const sel=$('fsArcPick'); if(!sel||!sel.value||!arcHandle)return;
+  const name=sel.value;
+  try{
+    let p='denied'; try{p=await arcHandle.queryPermission({mode:'read'});}catch(e){}
+    if(p!=='granted'){try{p=await arcHandle.requestPermission({mode:'read'});}catch(e){p='denied';}}
+    if(p!=='granted'){status('⚠️ Archive folder parhne ki ijazat nahi mili — browser ke prompt par Allow karein.');return;}
+    const files=await listFrom(arcHandle);
+    const f=files.find(x=>x.name===name);
+    if(!f){status('⚠️ Woh file archive folder mein nahi mili.');return;}
+    if(typeof processFile!=='function'){status('⚠️ App loader tayyar nahi — dobara try karein.');return;}
+    try{fileHandle=null;}catch(e){}
+    setMeta(null);   /* taake agli dafa main folder ki file lazmi dobara load ho */
+    pendingSrc='📦 Archive: '+(arcHandle.name||'');
+    const ok=await processFile(f);
+    if(ok===false){status('⚠️ Archive file parhne mein masla: <b>'+name+'</b>');return;}
+    status('✅ Archive se load ho gayi — <b>'+name+'</b> (file time: '+new Date(f.lastModified).toLocaleString()+'). Is mahine par wapas ane ke liye <b>Sync Now</b> dabayein.');
+  }catch(e){
+    status('⚠️ Archive parhne mein masla — folder dobara jod kar dekhein.');
+  }
 }
 function fillPick(files){
   const sel=$('fsPick'); if(!sel)return;
@@ -3313,9 +3366,51 @@ function renderBar(){
     bar.style.cssText='display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;background:var(--soft,#ecfdf5);border:1px solid var(--soft-border,#a7f3d0);border-radius:12px;padding:8px 14px;margin:0 0 12px;font-size:13.5px';
     host.insertBefore(bar,host.firstChild);
   }
+  let stale='';
+  if(info.lm){
+    const ageDays=Math.floor((Date.now()-info.lm)/864e5);
+    if(ageDays>=2)stale='<span style="color:#b45309;font-weight:700">⚠️ Yeh sheet '+ageDays+' din purani hai — nayi sheet save karke sync karein</span>';
+  }
   bar.innerHTML='📄 <b>'+String(info.name).replace(/</g,'&lt;')+'</b>'
     +(info.lm?'<span>🕒 Modified: <b>'+fmtDT(info.lm)+'</b></span>':'')
-    +(info.src?'<span>· '+String(info.src).replace(/</g,'&lt;')+'</span>':'');
+    +(info.src?'<span>· '+String(info.src).replace(/</g,'&lt;')+'</span>':'')
+    +stale;
+  if(typeof W!=='undefined'&&W&&W.length){
+    const b=document.createElement('button');
+    b.className='btn gold'; b.id='fsCopyBtn'; b.textContent='📋 Summary Copy';
+    b.style.cssText='margin-left:auto;padding:5px 12px;font-size:13px';
+    b.onclick=()=>copySummary(b);
+    bar.appendChild(b);
+  }
+}
+/* ---------- Summary copy: mahine ke totals clipboard par (Saadi suggestion #3, 2026-10-29) ---------- */
+function money(n){return 'Rs '+Math.round(n||0).toLocaleString('en-US');}
+function fallbackCopy(text){
+  const ta=document.createElement('textarea');
+  ta.value=text; ta.style.cssText='position:fixed;opacity:0';
+  document.body.appendChild(ta); ta.select();
+  try{document.execCommand('copy');}catch(e){}
+  ta.remove();
+}
+function copySummary(btn){
+  if(typeof W==='undefined'||!W||!W.length)return;
+  const sum=k=>W.reduce((a,w)=>a+(+w[k]||0),0);
+  let info=null; try{info=JSON.parse(localStorage.getItem(LS_FINFO)||'null')}catch(e){}
+  const title=($('reportTitle')&&$('reportTitle').value||'').trim();
+  const lines=['📊 Salary Summary'];
+  if(title)lines.push('🗓️ '+title);
+  if(info&&info.name)lines.push('📄 Sheet: '+info.name+(info.lm?' (Modified: '+fmtDT(info.lm)+')':''));
+  lines.push('👥 Workers: '+W.length);
+  lines.push('💼 Total Gross: '+money(sum('gross')));
+  lines.push('🧾 Total Net Payable: '+money(sum('net')));
+  lines.push('✅ Total Paid: '+money(sum('paid')));
+  lines.push('⏳ Total Unpaid: '+money(sum('unpaid')));
+  const text=lines.join('\n');
+  window.__SAL_SUMMARY__=text;
+  const done=()=>{if(btn){const old=btn.textContent;btn.textContent='✅ Copy ho gayi!';setTimeout(()=>{btn.textContent=old;},1800);}};
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(done).catch(()=>{fallbackCopy(text);done();});
+  }else{fallbackCopy(text);done();}
 }
 function saveFileInfo(f,src){
   try{localStorage.setItem(LS_FINFO,JSON.stringify({name:f.name,lm:f.lastModified||0,src:src||'Manual file',at:Date.now()}))}catch(e){}
@@ -3336,6 +3431,8 @@ renderBar();
 (async()=>{
   if(!supported)return;
   await loadHandle();
+  await loadArcHandle();
+  if(arcHandle){try{if((await arcHandle.queryPermission({mode:'read'}))==='granted')fillArc(await listFrom(arcHandle));}catch(e){}}
   if(!dirHandle){status('Folder connected nahi hai.');return;}
   const p=await permState();
   if(p==='granted'){
