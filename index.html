@@ -3142,4 +3142,152 @@ window.doPrint=function(){
 };
 })();
 </script>
+<script>
+/* ===== Folder Sync (Saadi, 2026-10-29): PC ka folder jodo — app khulte hi us ki sab se nayi salary sheet auto-sync =====
+   File System Access API (Chrome/Edge, PC). Directory handle app ki apni IndexedDB (kv store, key 'dirHandle')
+   mein save hota hai. Data device se bahar nahi jata. */
+(function(){
+const $=id=>document.getElementById(id);
+const LS_AUTO='salFolderAuto', LS_META='salFolderMeta';
+const supported = typeof window.showDirectoryPicker==='function';
+let dirHandle=null, busy=false, banner=null;
+const meta=()=>{try{return JSON.parse(localStorage.getItem(LS_META)||'null')}catch(e){return null}};
+const setMeta=m=>{try{if(m)localStorage.setItem(LS_META,JSON.stringify(m));else localStorage.removeItem(LS_META)}catch(e){}};
+const autoOn=()=>{try{return localStorage.getItem(LS_AUTO)!=='0'}catch(e){return true}};
+/* ---------- Settings card ---------- */
+let stEl=null;
+const sp=$('settingsPanel');
+if(sp){
+  const card=document.createElement('div');card.className='card';card.id='folderSyncCard';
+  card.innerHTML='<h3>📁 Folder Sync (PC)</h3>'
+    +'<p class="hint" id="fsStatus">Folder connected nahi hai.</p>'
+    +'<div class="controls" style="margin-top:10px">'
+    +'<div class="ctl"><label>&nbsp;</label><button class="btn primary" id="fsConn">📁 Folder jodein / badlein</button></div>'
+    +'<div class="ctl"><label>&nbsp;</label><button class="btn gold" id="fsSync">🔄 Sync Now</button></div>'
+    +'<div class="ctl"><label>&nbsp;</label><button class="btn ghost" id="fsRemove">Folder hatayein</button></div>'
+    +'<div class="ctl"><label>Auto-sync</label><label style="display:flex;gap:6px;align-items:center;font-size:14px"><input type="checkbox" id="fsAuto" checked> App khulte hi sync</label></div>'
+    +'</div>'
+    +'<p class="hint">Tareeqa: woh folder chunein jahan aap roz ki updated salary sheet save karte hain (masalan Desktop ya D: drive ka folder). App dobara khulne par us folder ki <b>sab se nayi</b> Excel/CSV file khud parh legi — roz file select nahi karni paregi. Yeh sahulat sirf PC par Chrome/Edge mein chalti hai; folder ka data aap ke PC se bahar kahin nahi jata.</p>';
+  sp.appendChild(card);
+  stEl=$('fsStatus');
+  const chk=$('fsAuto'); chk.checked=autoOn();
+  chk.onchange=()=>{try{localStorage.setItem(LS_AUTO,chk.checked?'1':'0')}catch(e){}};
+  $('fsConn').onclick=connect;
+  $('fsSync').onclick=()=>syncNow();
+  $('fsRemove').onclick=removeFolder;
+  if(!supported){
+    stEl.innerHTML='⚠️ Is browser/mobile mein folder sync nahi chalta — PC par <b>Chrome ya Edge</b> use karein. File select wala purana tareeqa har jagah chalta rahega.';
+    $('fsConn').disabled=true; $('fsSync').disabled=true;
+  }
+}
+const status=t=>{if(stEl)stEl.innerHTML=t};
+/* ---------- handle store ---------- */
+async function loadHandle(){
+  if(window.__SAL_DIR__){dirHandle=window.__SAL_DIR__;return dirHandle;}
+  try{dirHandle=(typeof idbGet==='function')?(await idbGet('dirHandle'))||null:null;}catch(e){dirHandle=null;}
+  return dirHandle;
+}
+async function saveHandle(){
+  if(window.__SAL_DIR__)return;
+  try{
+    if(dirHandle&&typeof idbSet==='function')await idbSet('dirHandle',dirHandle);
+    else if(typeof idbDel==='function')idbDel('dirHandle');
+  }catch(e){}
+}
+async function permState(){if(!dirHandle)return'none';try{return await dirHandle.queryPermission({mode:'read'})}catch(e){return'denied'}}
+async function ensurePerm(ask){
+  const p=await permState(); if(p==='granted')return true;
+  if(ask&&dirHandle){try{return (await dirHandle.requestPermission({mode:'read'}))==='granted'}catch(e){return false}}
+  return false;
+}
+/* ---------- folder scan: sab se nayi Excel/CSV file ---------- */
+async function newestFile(){
+  let bestF=null;
+  for await(const h of dirHandle.values()){
+    if(!h||h.kind!=='file')continue;
+    const n=h.name||'';
+    if(n.indexOf('~$')===0)continue;                 /* Excel ki lock file skip */
+    if(!/\.(xlsx|xls|csv)$/i.test(n))continue;
+    try{const f=await h.getFile(); if(!bestF||f.lastModified>bestF.lastModified)bestF=f;}catch(e){}
+  }
+  return bestF;
+}
+async function scanAndLoad(manual){
+  if(busy||!dirHandle)return false; busy=true;
+  try{
+    status('🔄 Folder check ho raha hai… ('+(dirHandle.name||'folder')+')');
+    const f=await newestFile();
+    if(!f){status('⚠️ Folder <b>'+(dirHandle.name||'')+'</b> mein koi Excel/CSV file nahi mili.');return false;}
+    const sig=f.name+'|'+f.lastModified+'|'+f.size;
+    const m=meta();
+    const haveData=(typeof W!=='undefined'&&W&&W.length>0);
+    if(!manual&&m&&m.sig===sig&&haveData){
+      status('✅ Folder sync up to date hai — <b>'+f.name+'</b> ('+new Date(f.lastModified).toLocaleString()+') mein koi tabdeeli nahi.');
+      return true;
+    }
+    if(typeof processFile!=='function'){status('⚠️ App loader tayyar nahi — dobara try karein.');return false;}
+    try{fileHandle=null;}catch(e){}
+    const ok=await processFile(f);
+    if(ok===false){status('⚠️ File parhne mein masla: <b>'+f.name+'</b> — folder mein salary sheet wali file rakhein.');return false;}
+    setMeta({sig: sig, name: f.name, lm: f.lastModified, at: Date.now()});
+    status('✅ Sync ho gaya — <b>'+f.name+'</b> (file time: '+new Date(f.lastModified).toLocaleString()+') · '+new Date().toLocaleTimeString()+' par load hua.');
+    return true;
+  }catch(e){
+    status('⚠️ Folder parhne mein masla — folder move ya delete to nahi ho gaya? Folder dobara jod kar dekhein.');
+    return false;
+  }finally{busy=false;}
+}
+/* ---------- actions ---------- */
+async function connect(){
+  if(!supported)return;
+  try{
+    const h=await window.showDirectoryPicker({mode:'read'});
+    dirHandle=h; await saveHandle(); setMeta(null);
+    status('✅ Folder jud gaya: <b>'+(h.name||'')+'</b> — ab sync ho raha hai…');
+    await scanAndLoad(true);
+  }catch(e){/* user ne picker cancel kar diya */}
+}
+async function syncNow(){
+  if(!supported)return;
+  if(!dirHandle)await loadHandle();
+  if(!dirHandle){status('⚠️ Pehle folder jodein.');return;}
+  if(!(await ensurePerm(true))){status('⚠️ Folder parhne ki ijazat nahi mili — browser ke prompt par Allow karein.');return;}
+  hideBanner();
+  await scanAndLoad(true);
+}
+async function removeFolder(){
+  dirHandle=null; await saveHandle(); setMeta(null); hideBanner();
+  status('Folder hata diya gaya. Ab purana tareeqa (file select / single file refresh) chalega.');
+}
+/* ---------- ijazat wala banner (browser dobara khulne par kabhi aik click maangta hai) ---------- */
+function hideBanner(){if(banner){banner.remove();banner=null;}}
+function needBanner(){
+  if(banner||!dirHandle)return;
+  banner=document.createElement('div');
+  banner.id='fsBanner';
+  banner.style.cssText='position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:99998;background:#065f46;color:#fff;padding:10px 14px;border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,.35);display:flex;gap:10px;align-items:center;font-size:14px;max-width:94vw';
+  banner.innerHTML='<span>📁 Salary folder ready hai</span>';
+  const b=document.createElement('button');b.className='btn gold';b.textContent='Sync ke liye click karein';
+  b.onclick=async()=>{if(await ensurePerm(true)){hideBanner();scanAndLoad(false);}else status('⚠️ Ijazat nahi mili — Sync Now se dobara try karein.');};
+  const x=document.createElement('button');x.className='btn ghost';x.textContent='✖';x.onclick=hideBanner;
+  banner.appendChild(b);banner.appendChild(x);document.body.appendChild(banner);
+}
+/* ---------- init: app khulte hi ---------- */
+(async()=>{
+  if(!supported)return;
+  await loadHandle();
+  if(!dirHandle){status('Folder connected nahi hai.');return;}
+  const p=await permState();
+  if(p==='granted'){
+    status('✅ Folder connected: <b>'+(dirHandle.name||'')+'</b>');
+    if(autoOn())scanAndLoad(false);
+  }else{
+    status('📁 Folder connected hai: <b>'+(dirHandle.name||'')+'</b> — sync ke liye aik dafa ijazat chahiye (upar wala button ya Settings → Sync Now).');
+    needBanner();
+  }
+})();
+window.SalFolder={syncNow: syncNow, connect: connect, remove: removeFolder};
+})();
+</script>
+
 </html>
