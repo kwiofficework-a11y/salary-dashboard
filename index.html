@@ -3164,10 +3164,11 @@ if(sp){
     +'<div class="controls" style="margin-top:10px">'
     +'<div class="ctl"><label>&nbsp;</label><button class="btn primary" id="fsConn">📁 Folder jodein / badlein</button></div>'
     +'<div class="ctl"><label>&nbsp;</label><button class="btn gold" id="fsSync">🔄 Sync Now</button></div>'
+    +'<div class="ctl"><label>Folder ki sheets — ghalat pick ho to yahan se badlein</label><select id="fsPick" style="max-width:100%"><option value="">🔄 Auto — sab se nayi file</option></select></div>'
     +'<div class="ctl"><label>&nbsp;</label><button class="btn ghost" id="fsRemove">Folder hatayein</button></div>'
     +'<div class="ctl"><label>Auto-sync</label><label style="display:flex;gap:6px;align-items:center;font-size:14px"><input type="checkbox" id="fsAuto" checked> App khulte hi sync</label></div>'
     +'</div>'
-    +'<p class="hint">Tareeqa: woh folder chunein jahan aap roz ki updated salary sheet save karte hain (masalan Desktop ya D: drive ka folder). App dobara khulne par us folder ki <b>sab se nayi</b> Excel/CSV file khud parh legi — roz file select nahi karni paregi. Yeh sahulat sirf PC par Chrome/Edge mein chalti hai; folder ka data aap ke PC se bahar kahin nahi jata.</p>';
+    +'<p class="hint">Tareeqa: woh folder chunein jahan aap roz ki updated salary sheet save karte hain (masalan Desktop ya D: drive ka folder). App dobara khulne par us folder ki <b>sab se nayi</b> Excel/CSV file khud parh legi — roz file select nahi karni paregi. Agar kabhi ghalat file uth jaye to upar wale <b>drop-down</b> se sahi sheet chun lein — aap ki choice yaad rahegi, aur "Auto" par wapas lagane se phir sab se nayi file khud ayegi. Yeh sahulat sirf PC par Chrome/Edge mein chalti hai; folder ka data aap ke PC se bahar kahin nahi jata.</p>';
   sp.appendChild(card);
   stEl=$('fsStatus');
   const chk=$('fsAuto'); chk.checked=autoOn();
@@ -3175,9 +3176,10 @@ if(sp){
   $('fsConn').onclick=connect;
   $('fsSync').onclick=()=>syncNow();
   $('fsRemove').onclick=removeFolder;
+  $('fsPick').onchange=onPickChange;
   if(!supported){
     stEl.innerHTML='⚠️ Is browser/mobile mein folder sync nahi chalta — PC par <b>Chrome ya Edge</b> use karein. File select wala purana tareeqa har jagah chalta rahega.';
-    $('fsConn').disabled=true; $('fsSync').disabled=true;
+    $('fsConn').disabled=true; $('fsSync').disabled=true; $('fsPick').disabled=true;
   }
 }
 const status=t=>{if(stEl)stEl.innerHTML=t};
@@ -3200,24 +3202,46 @@ async function ensurePerm(ask){
   if(ask&&dirHandle){try{return (await dirHandle.requestPermission({mode:'read'}))==='granted'}catch(e){return false}}
   return false;
 }
-/* ---------- folder scan: sab se nayi Excel/CSV file ---------- */
-async function newestFile(){
-  let bestF=null;
+/* ---------- folder scan: saari Excel/CSV files + drop-down (ghalat pick badalna, Saadi 2026-10-29) ---------- */
+const LS_PICK='salFolderPick';
+const pickName=()=>{try{return localStorage.getItem(LS_PICK)||''}catch(e){return ''}};
+const setPick=n=>{try{if(n)localStorage.setItem(LS_PICK,n);else localStorage.removeItem(LS_PICK)}catch(e){}};
+async function listFiles(){
+  const out=[];
   for await(const h of dirHandle.values()){
     if(!h||h.kind!=='file')continue;
     const n=h.name||'';
     if(n.indexOf('~$')===0)continue;                 /* Excel ki lock file skip */
     if(!/\.(xlsx|xls|csv)$/i.test(n))continue;
-    try{const f=await h.getFile(); if(!bestF||f.lastModified>bestF.lastModified)bestF=f;}catch(e){}
+    try{out.push(await h.getFile());}catch(e){}
   }
-  return bestF;
+  out.sort((a,b)=>b.lastModified-a.lastModified);    /* sab se nayi pehle */
+  return out;
+}
+function fillPick(files){
+  const sel=$('fsPick'); if(!sel)return;
+  const cur=pickName();
+  sel.innerHTML='<option value="">🔄 Auto — sab se nayi file</option>'+files.map(f=>'<option value="'+f.name.replace(/"/g,'&quot;')+'">'+f.name.replace(/</g,'&lt;')+' · '+fmtDT(f.lastModified)+'</option>').join('');
+  sel.value=files.some(f=>f.name===cur)?cur:'';
+}
+async function onPickChange(){
+  const sel=$('fsPick'); if(!sel||!dirHandle)return;
+  setPick(sel.value||'');
+  if(!(await ensurePerm(true))){status('⚠️ Folder parhne ki ijazat nahi mili — browser ke prompt par Allow karein.');return;}
+  hideBanner();
+  scanAndLoad(true);
 }
 async function scanAndLoad(manual){
   if(busy||!dirHandle)return false; busy=true;
   try{
     status('🔄 Folder check ho raha hai… ('+(dirHandle.name||'folder')+')');
-    const f=await newestFile();
-    if(!f){status('⚠️ Folder <b>'+(dirHandle.name||'')+'</b> mein koi Excel/CSV file nahi mili.');return false;}
+    const files=await listFiles();
+    fillPick(files);
+    if(!files.length){status('⚠️ Folder <b>'+(dirHandle.name||'')+'</b> mein koi Excel/CSV file nahi mili.');return false;}
+    const pk=pickName();
+    let f=pk?files.find(x=>x.name===pk):null;
+    const fellBack=!!(pk&&!f);
+    if(!f)f=files[0];                                 /* Auto: sab se nayi */
     const sig=f.name+'|'+f.lastModified+'|'+f.size;
     const m=meta();
     const haveData=(typeof W!=='undefined'&&W&&W.length>0);
@@ -3227,10 +3251,11 @@ async function scanAndLoad(manual){
     }
     if(typeof processFile!=='function'){status('⚠️ App loader tayyar nahi — dobara try karein.');return false;}
     try{fileHandle=null;}catch(e){}
+    pendingSrc='📁 Folder: '+(dirHandle.name||'');
     const ok=await processFile(f);
     if(ok===false){status('⚠️ File parhne mein masla: <b>'+f.name+'</b> — folder mein salary sheet wali file rakhein.');return false;}
     setMeta({sig: sig, name: f.name, lm: f.lastModified, at: Date.now()});
-    status('✅ Sync ho gaya — <b>'+f.name+'</b> (file time: '+new Date(f.lastModified).toLocaleString()+') · '+new Date().toLocaleTimeString()+' par load hua.');
+    status('✅ Sync ho gaya — <b>'+f.name+'</b> (file time: '+new Date(f.lastModified).toLocaleString()+') · '+new Date().toLocaleTimeString()+' par load hua.'+(fellBack?'<br>ℹ️ Drop-down wali file (<b>'+pk+'</b>) folder mein nahi mili — sab se nayi file load kar di hai.':''));
     return true;
   }catch(e){
     status('⚠️ Folder parhne mein masla — folder move ya delete to nahi ho gaya? Folder dobara jod kar dekhein.');
@@ -3242,7 +3267,7 @@ async function connect(){
   if(!supported)return;
   try{
     const h=await window.showDirectoryPicker({mode:'read'});
-    dirHandle=h; await saveHandle(); setMeta(null);
+    dirHandle=h; await saveHandle(); setMeta(null); setPick('');
     status('✅ Folder jud gaya: <b>'+(h.name||'')+'</b> — ab sync ho raha hai…');
     await scanAndLoad(true);
   }catch(e){/* user ne picker cancel kar diya */}
@@ -3256,7 +3281,8 @@ async function syncNow(){
   await scanAndLoad(true);
 }
 async function removeFolder(){
-  dirHandle=null; await saveHandle(); setMeta(null); hideBanner();
+  dirHandle=null; await saveHandle(); setMeta(null); setPick(''); hideBanner();
+  const sel=$('fsPick'); if(sel)sel.innerHTML='<option value="">🔄 Auto — sab se nayi file</option>';
   status('Folder hata diya gaya. Ab purana tareeqa (file select / single file refresh) chalega.');
 }
 /* ---------- ijazat wala banner (browser dobara khulne par kabhi aik click maangta hai) ---------- */
@@ -3272,6 +3298,40 @@ function needBanner(){
   const x=document.createElement('button');x.className='btn ghost';x.textContent='✖';x.onclick=hideBanner;
   banner.appendChild(b);banner.appendChild(x);document.body.appendChild(banner);
 }
+/* ---------- Dashboard par file info bar: sheet ka naam + modified date/time (Saadi, 2026-10-29) ---------- */
+const LS_FINFO='salFileInfo';
+let pendingSrc='';
+const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function fmtDT(ts){if(!ts)return'';const d=new Date(ts);let h=d.getHours();const ap=h>=12?'PM':'AM';h=h%12||12;const mm=String(d.getMinutes()).padStart(2,'0');return d.getDate()+' '+MON[d.getMonth()]+' '+d.getFullYear()+', '+h+':'+mm+' '+ap;}
+function renderBar(){
+  const host=$('view-dash'); if(!host)return;
+  let bar=$('fileInfoBar');
+  let info=null; try{info=JSON.parse(localStorage.getItem(LS_FINFO)||'null')}catch(e){}
+  if(!info||!info.name){if(bar)bar.remove();return;}
+  if(!bar){
+    bar=document.createElement('div'); bar.id='fileInfoBar';
+    bar.style.cssText='display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;background:var(--soft,#ecfdf5);border:1px solid var(--soft-border,#a7f3d0);border-radius:12px;padding:8px 14px;margin:0 0 12px;font-size:13.5px';
+    host.insertBefore(bar,host.firstChild);
+  }
+  bar.innerHTML='📄 <b>'+String(info.name).replace(/</g,'&lt;')+'</b>'
+    +(info.lm?'<span>🕒 Modified: <b>'+fmtDT(info.lm)+'</b></span>':'')
+    +(info.src?'<span>· '+String(info.src).replace(/</g,'&lt;')+'</span>':'');
+}
+function saveFileInfo(f,src){
+  try{localStorage.setItem(LS_FINFO,JSON.stringify({name:f.name,lm:f.lastModified||0,src:src||'Manual file',at:Date.now()}))}catch(e){}
+  renderBar();
+}
+if(typeof processFile==='function'){
+  const _pf=processFile;
+  processFile=async function(f){
+    try{
+      const r=await _pf(f);
+      try{if(f&&f.name)saveFileInfo(f,pendingSrc||'Manual file');}catch(e){}
+      return r;
+    }finally{pendingSrc='';}
+  };
+}
+renderBar();
 /* ---------- init: app khulte hi ---------- */
 (async()=>{
   if(!supported)return;
@@ -3281,6 +3341,7 @@ function needBanner(){
   if(p==='granted'){
     status('✅ Folder connected: <b>'+(dirHandle.name||'')+'</b>');
     if(autoOn())scanAndLoad(false);
+    else listFiles().then(fillPick).catch(()=>{});
   }else{
     status('📁 Folder connected hai: <b>'+(dirHandle.name||'')+'</b> — sync ke liye aik dafa ijazat chahiye (upar wala button ya Settings → Sync Now).');
     needBanner();
