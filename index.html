@@ -203,6 +203,17 @@ body.ur .ai-card { text-align:right; }
   html[data-theme=dark] .hero .hcard{background:#111827}
   html[data-theme=dark] details.dblock{background:#111827}
   html[data-theme=dark] details.dblock summary{background:#1e293b}
+  /* Dark readability fixes (Saadi 2026-10-29): halki satah par gehra text, gehri satah par roshan text */
+  html[data-theme=dark] .btn.ghost{background:#1e293b!important;color:#e5e7eb!important;border-color:#334155!important}
+  html[data-theme=dark] .amtchip{background:#1e293b!important;color:#e5e7eb!important;border-color:#334155!important}
+  html[data-theme=dark] .amtchip b,html[data-theme=dark] .amtchip .al{color:#f8fafc!important}
+  html[data-theme=dark] .hcard .hval{color:#f8fafc!important}
+  html[data-theme=dark] .slip{color:#0f172a!important}
+  html[data-theme=dark] .slip b,html[data-theme=dark] .slip span,html[data-theme=dark] .slip td,html[data-theme=dark] .slip div,html[data-theme=dark] .slip p{color:#0f172a!important}
+  html[data-theme=dark] .slip th{background:#dcfce7!important;color:#14532d!important}
+  html[data-theme=dark] .slip .amtchip.grn{background:#dcfce7!important;color:#14532d!important}
+  html[data-theme=dark] .slip .amtchip.red{background:#fee2e2!important;color:#7f1d1d!important}
+  html[data-theme=dark] .slip .amtchip b,html[data-theme=dark] .slip .amtchip .al{color:inherit!important}
   @media print{body.onep-print>*:not(#opPrintBox){display:none!important}body.onep-print #opPrintBox{display:block!important;position:static!important}body.onep-print #opPrintBox,body.onep-print #opPrintBox *{visibility:visible!important}}
 
 </style>
@@ -2808,13 +2819,16 @@ const _sv=window.showView;
 window.showView=function(v){_sv(v);NEW.forEach(([k])=>{const el=$('view-'+k);if(el)el.style.display=k===v?'':'none';});if(v==='history')rHist();if(v==='paymode')rPay();if(v==='move')rMove();if(v==='onep')rOne();};
 document.querySelectorAll('.vtab').forEach(b=>{if(b.dataset.view)b.onclick=()=>window.showView(b.dataset.view);});
 /* bank / cash */
+
 function rPay(){const m=new Map();W.forEach(w=>{const k=(w.mode||'').trim()||'(Not specified)';const o=m.get(k)||{n:0,net:0,paid:0,un:0,uw:0};o.n++;o.net+=w.net;o.paid+=w.paid;o.un+=w.unpaid;if(w.unpaid>0)o.uw++;m.set(k,o);});
  const rows=[...m.entries()].sort((a,b)=>b[1].net-a[1].net).map(([k,o])=>[k,o.n,o.net,o.paid,o.un,o.uw]);
  const none=rows.length===1&&rows[0][0]==='(Not specified)';
  $('c-paymode').innerHTML='<h3>🏦 Payment Mode — Bank / Cash / Cheque split</h3>'+(none?'<p class="hint">No payment-mode column found. Add a column named <b>PAYMENT MODE</b> (values like Bank, Cash, Cheque) to the salary sheet and press Refresh.</p>':'')+tbl(['Mode','Workers','Net Payable','Paid','Unpaid','Unpaid workers'],rows)+'<button class="btn ghost" id="pmCsv" style="margin-top:10px">⬇️ Unpaid list by mode (CSV)</button>';
  $('pmCsv').onclick=()=>csv('Unpaid_By_Mode.csv',[['Mode','Code','Name','Department','Unpaid'],...W.filter(w=>w.unpaid>0).sort((a,b)=>(a.mode||'').localeCompare(b.mode||'')).map(w=>[w.mode||'',w.code,w.name,w.dept,Math.round(w.unpaid)])]);}
 
+
 /* monthly history */
+
 const MET={net:'Net Payable',gross:'Gross',paid:'Paid',unpaid:'Unpaid',otAmt:'OT Amount',n:'Headcount'};let hm='net';
 async function rHist(){const hist=((await idbGet('hist'))||[]).sort((a,b)=>a.at-b.at);const lab=(SET.month||$('reportTitle').value||'').trim();
  const el=$('c-history');
@@ -2831,7 +2845,9 @@ async function rHist(){const hist=((await idbGet('hist'))||[]).sort((a,b)=>a.at-
  $('hOut').innerHTML=o;
  $('hOut').querySelectorAll('tbody tr').forEach((tr,i)=>{if(i<hist.length&&tr.lastChild.textContent==='✕'){tr.lastChild.style.cursor='pointer';tr.lastChild.onclick=async()=>{if(confirm('Delete '+hist[i].label+'?')){await idbSet('hist',hist.filter((_,j)=>j!==i));rHist();}};}});}
 
+
 /* movement + one-pager */
+
 /* movement */
 let mvA='',mvB='';const K=r=>String(r[0]||r[1]).trim().toUpperCase();
 async function rMove(){const hist=((await idbGet('hist'))||[]).sort((a,b)=>a.at-b.at);const R=(await idbGet('roster'))||{};const labs=hist.map(h=>h.label).filter(l=>R[l]);const el=$('c-move');
@@ -2864,6 +2880,7 @@ async function onepHTML(){const t=totals(W);const hist=((await idbGet('hist'))||
  return '<div style="font-family:Segoe UI,system-ui,sans-serif;color:#0f172a"><div style="border-bottom:3px solid #059669;padding-bottom:6px;margin-bottom:10px"><h2 style="margin:0">Management Summary — '+H((SET&&SET.month)||($('reportTitle')&&$('reportTitle').value)||'Salary Report')+'</h2><div style="font-size:12px;color:#64748b">Generated '+new Date().toLocaleDateString('en-GB')+'</div></div><div style="display:flex;gap:8px;flex-wrap:wrap">'+k('Workers',F(t.n))+k('Gross',F(t.gross))+k('Net payable',F(t.net))+k('Paid',F(t.paid))+k('Unpaid',F(t.unpaid))+k('OT amount',F(t.otAmt))+'</div><h4>Top departments by Net</h4>'+bars(topNet,'net')+(topUn.length?'<h4>Unpaid by department</h4>'+bars(topUn,'un'):'')+mv+tr+'<h4>Points to watch</h4><ul style="margin:4px 0 14px;padding-left:18px;font-size:13px">'+pts.map(p=>'<li>'+H(p)+'</li>').join('')+'</ul><div style="display:flex;gap:30px;margin-top:34px;font-size:12px">'+['HR Manager','Accounts','General Manager'].map(x=>'<div style="flex:1;border-top:1px solid #0f172a;padding-top:4px;text-align:center">'+x+'</div>').join('')+'</div></div>';}
 async function rOne(){const el=$('c-onep');el.innerHTML='<h3>🧾 Management One-Pager</h3><button class="btn primary" id="opPrint" style="margin-bottom:10px">🖨️ Print / Save PDF</button><div id="opBody" style="background:#fff;color:#0f172a;border:1px solid #e2e8f0;border-radius:10px;padding:16px"></div>';const h=await onepHTML();$('opBody').innerHTML=h;
  $('opPrint').onclick=()=>{let p=$('opPrintBox');if(!p){p=document.createElement('div');p.id='opPrintBox';document.body.appendChild(p);}p.innerHTML=h;document.body.classList.add('onep-print');const done=()=>{document.body.classList.remove('onep-print');window.removeEventListener('afterprint',done);};window.addEventListener('afterprint',done);window.print();};}
+
 
 /* settings: PIN lock */
 const sp=$('settingsPanel');
@@ -2908,6 +2925,7 @@ if('serviceWorker' in navigator&&/^https?:/.test(location.protocol)){let _swR=fa
 </script>
 
 <style id="mblCss">
+.hcard{cursor:pointer}
 /* ===== Jadogar AI = centered 3D popup (har screen par) ===== */
 #aiDrawer{top:50%!important;left:50%!important;right:auto!important;height:min(680px,92dvh)!important;width:min(540px,94vw)!important;border-radius:22px!important;transform:translate(-50%,-46%) scale(.9)!important;opacity:0;pointer-events:none;transition:transform .3s cubic-bezier(.2,.9,.3,1.25),opacity .25s ease!important;box-shadow:0 30px 90px rgba(0,0,0,.5)!important;overflow:hidden}
 #aiDrawer.open{transform:translate(-50%,-50%) scale(1)!important;opacity:1;pointer-events:auto}
@@ -2925,6 +2943,9 @@ body.ur #aiDrawer.open{transform:translate(-50%,-50%) scale(1)!important}
  .kpis{grid-template-columns:1fr 1fr!important}
  .tblwrap{max-width:100%!important}
  .grid2>*{min-width:0!important}
+ .slip{max-width:100%!important;padding:12px!important}
+ .slip>div:nth-of-type(3){grid-template-columns:1fr!important}
+ .slip table{width:100%!important;max-width:100%!important}
  #sideNav{position:fixed!important;left:0;top:0;height:100dvh!important;max-height:100dvh!important;width:min(300px,85vw)!important;z-index:930;transform:translateX(-107%);transition:transform .3s ease;border-radius:0 16px 16px 0!important;box-shadow:8px 0 30px rgba(0,0,0,.3);flex:none!important}
  body:not(.navhidden) #sideNav{transform:none}
  body.ur #sideNav{left:auto;right:0;transform:translateX(107%);border-radius:16px 0 0 16px!important}
@@ -2973,7 +2994,21 @@ body.ur #aiDrawer.open{transform:translate(-50%,-50%) scale(1)!important}
  /* robot icon: purana Jadogar button hata kar saaf robot button — click par AI Assistant popup */
  const _fab=document.getElementById('aiFab');
  if(_fab){const nf=document.createElement('button');nf.id='aiFab';nf.title='AI Assistant';nf.innerHTML='<span style="font-size:34px;line-height:1">\u{1F916}</span>';nf.addEventListener('click',()=>{if(typeof openAI==='function')openAI();});_fab.replaceWith(nf);}
- /* assistant header: animated Jadogar hata kar static robot + saaf title */
+ /* main cards (hero .hcard) par click -> detail popup (Saadi 2026-10-29) */
+document.addEventListener('click',e=>{
+  const hc=e.target.closest('.hcard'); if(!hc||e.target.closest('#aiModal'))return;
+  const t=hc.textContent||''; let k=null;
+  if(/Gross/i.test(t))k='gross'; else if(/Net Payable/i.test(t))k='net';
+  else if(/Unpaid/i.test(t))k='unpaid'; else if(/Paid/i.test(t))k='paid';
+  else if(/Over\s?Time/i.test(t))k='ot'; else if(/Mess Allowance/i.test(t))k='messpayable';
+  else if(/Advance/i.test(t))k='adv'; else if(/Canteen/i.test(t))k='canteen';
+  else if(/Workers|Employees|Headcount/i.test(t))k='workers';
+  if(!k||typeof openAmtDetail!=='function')return;
+  let chip=document.querySelector('#amtCards .amtchip[data-k="'+k+'"]')||document.querySelector('.amtchip[data-k="'+k+'"]');
+  if(!chip){chip=document.createElement('button');chip.dataset.k=k;chip.dataset.v='insights';const al=document.createElement('span');al.className='al';al.textContent=k;chip.appendChild(al);}
+  openAmtDetail(chip);
+});
+/* assistant header: animated Jadogar hata kar static robot + saaf title */
  const _js=document.querySelector('#aiDrawer .jstack2');
  if(_js)_js.innerHTML='<span style="font-size:42px;line-height:1">\u{1F916}</span>';
  [...document.querySelectorAll('.ai-head *')].forEach(e=>{if(e.children.length===0&&/Jadogar|جادوگر/.test(e.textContent))e.textContent='\u{1F916} AI Assistant';});
