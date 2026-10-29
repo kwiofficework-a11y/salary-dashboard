@@ -3057,5 +3057,89 @@ document.addEventListener('click',e=>{
  document.addEventListener('click',e=>{if(mob()&&!document.body.classList.contains('navhidden')&&!e.target.closest('#sideNav')&&!e.target.closest('#navBtn'))document.body.classList.add('navhidden');});
 })();
 </script>
-</body>
+<script>
+/* ===== Extras (Saadi 2026-10-29): Canteen dept-wise matrix + Print tick-box options ===== */
+(function(){
+const F=n=>Math.round(n||0).toLocaleString('en-US');
+const PC=(a,b)=>b>0?((a/b*100).toFixed(1)+'%'):'—';
+const CANS=(typeof CANTEENS!=='undefined'&&CANTEENS.length)?CANTEENS:[['Ahmad Baksh','can1'],['Sh. Shahzad','can2'],['Murtaza','can3'],['Shakeel','can4']];
+function deptCanData(){
+  const rows={}; let gt=0; const ct={}; CANS.forEach(c=>ct[c[1]]=0);
+  (typeof W!=='undefined'?W:[]).forEach(w=>{ const tot=CANS.reduce((a,c)=>a+(w[c[1]]||0),0); if(tot<=0)return;
+    const d=w.dept||'—'; if(!rows[d]){rows[d]={dept:d,workers:0,total:0}; CANS.forEach(c=>rows[d][c[1]]=0);}
+    rows[d].workers++; rows[d].total+=tot; gt+=tot; CANS.forEach(c=>{rows[d][c[1]]+=(w[c[1]]||0); ct[c[1]]+=(w[c[1]]||0);}); });
+  return {rows:Object.values(rows).sort((a,b)=>b.total-a.total), gt, ct};
+}
+function deptCanHTML(){
+  const {rows,gt,ct}=deptCanData(); if(!rows.length||!gt)return '';
+  const head='<tr><th>Department</th><th class="num">Workers</th>'+CANS.map(c=>'<th class="num">'+c[0]+'</th>').join('')+'<th class="num">Total</th></tr>';
+  const body=rows.map(r=>'<tr><td>'+r.dept+'</td><td class="num">'+r.workers+'</td>'+CANS.map(c=>'<td class="num">'+(r[c[1]]?F(r[c[1]])+' <small style="opacity:.65">('+PC(r[c[1]],r.total)+')</small>':'—')+'</td>').join('')+'<td class="num"><b>'+F(r.total)+'</b> <small style="opacity:.65">('+PC(r.total,gt)+')</small></td></tr>').join('');
+  const foot='<tr><td><b>TOTAL</b></td><td class="num"><b>'+rows.reduce((a,r)=>a+r.workers,0)+'</b></td>'+CANS.map(c=>'<td class="num"><b>'+F(ct[c[1]])+'</b> <small style="opacity:.65">('+PC(ct[c[1]],gt)+')</small></td>').join('')+'<td class="num"><b>'+F(gt)+'</b></td></tr>';
+  return '<h4 style="margin:16px 0 6px">🍽️ Department-wise Canteen — kis department ne kis canteen se kitna khaya</h4>'
+    +'<p style="font-size:12px;opacity:.75;margin:0 0 6px">Har cell mein raqam ke sath us department ke kul canteen ka percentage hai; Total column mein poori canteen recovery ka percentage hai.</p>'
+    +'<div class="tblwrap"><table><thead>'+head+'</thead><tbody>'+body+foot+'</tbody></table></div>';
+}
+/* canteen report view mein matrix jorna */
+function addMatrix(){
+  const el=document.getElementById('canRepBody'); if(!el||el.querySelector('.deptcan-box'))return;
+  const h=deptCanHTML(); if(!h)return;
+  const d=document.createElement('div'); d.className='deptcan-box'; d.innerHTML=h; el.appendChild(d);
+}
+if(typeof window.renderCanRep==='function'){ const _r=window.renderCanRep; window.renderCanRep=function(){ _r(); addMatrix(); }; }
+addMatrix();
+
+/* ---------- Print tick-boxes: har report ke print par extra data ki choice ---------- */
+const EXTRAS=[
+ ['amounts','💰 Main Amounts (kul raqamain)'],
+ ['deptsum','🏢 Department-wise Summary'],
+ ['cansum','🏪 Canteen Summary (har canteen ka total + %)'],
+ ['deptcan','🍽️ Department × Canteen (dept-wise % wali report)'],
+ ['messsum','🍲 Mess Summary'],
+ ['topunpaid','⚠️ Top 15 Unpaid Workers']];
+const SKIP={dash:['amounts'],canrep:['cansum','deptcan'],final:['deptsum'],sections:['deptsum'],exec:['amounts','deptsum']};
+function getSel(){ try{return JSON.parse(localStorage.getItem('salPrintExtras')||'{}');}catch(e){return{};} }
+function extraHTML(k){
+  const t=(typeof totals==='function')?totals(W):null;
+  if(k==='amounts'&&t) return '<h4>💰 Main Amounts</h4><table border="1" cellspacing="0" cellpadding="5" style="border-collapse:collapse;width:100%"><tr><td>Workers</td><td>'+F(W.length)+'</td><td>Gross</td><td>'+F(t.gross)+'</td></tr><tr><td>Over Time</td><td>'+F(t.otAmt)+'</td><td>Mess Allowance</td><td>'+F(t.mess)+'</td></tr><tr><td>Advance</td><td>'+F(t.totAdv)+'</td><td>Canteen</td><td>'+F(t.canteen)+'</td></tr><tr><td>Net Payable</td><td>'+F(t.net)+'</td><td>Paid</td><td>'+F(t.paid)+'</td></tr><tr><td>Unpaid</td><td colspan="3">'+F(t.unpaid)+'</td></tr></table>';
+  if(k==='deptsum'&&typeof groupAgg==='function'){ const g=groupAgg(w=>w.dept).slice().sort((a,b)=>b.net-a.net);
+    return '<h4>🏢 Department-wise Summary</h4><div class="tblwrap"><table><thead><tr><th>Department</th><th class="num">Workers</th><th class="num">Gross</th><th class="num">Net</th><th class="num">Paid</th><th class="num">Unpaid</th></tr></thead><tbody>'
+    +g.map(r=>'<tr><td>'+r.key+'</td><td class="num">'+r.n+'</td><td class="num">'+F(r.gross)+'</td><td class="num">'+F(r.net)+'</td><td class="num">'+F(r.paid)+'</td><td class="num">'+F(r.unpaid)+'</td></tr>').join('')+'</tbody></table></div>'; }
+  if(k==='cansum'){ const {ct,gt}=deptCanData(); if(!gt)return '';
+    return '<h4>🏪 Canteen Summary</h4><table border="1" cellspacing="0" cellpadding="5" style="border-collapse:collapse;width:100%">'+CANS.map(c=>'<tr><td>'+c[0]+'</td><td>'+F(ct[c[1]])+'</td><td>'+PC(ct[c[1]],gt)+'</td></tr>').join('')+'<tr><td><b>Total</b></td><td><b>'+F(gt)+'</b></td><td>100%</td></tr></table>'; }
+  if(k==='deptcan') return deptCanHTML();
+  if(k==='messsum'&&t){ const m1=t.messPayable||0,m2=t.xMess||0;
+    return '<h4>🍲 Mess Summary</h4><table border="1" cellspacing="0" cellpadding="5" style="border-collapse:collapse;width:100%"><tr><td>Mess Allowance (kul)</td><td>'+F(t.mess)+'</td></tr>'+(m1?'<tr><td>Mess-1 Payable</td><td>'+F(m1)+'</td></tr>':'')+(m2?'<tr><td>Mess-2 Net</td><td>'+F(m2)+'</td></tr>':'')+'</table>'; }
+  if(k==='topunpaid'){ const list=[...W].filter(w=>(w.unpaid||0)>0).sort((a,b)=>b.unpaid-a.unpaid).slice(0,15); if(!list.length)return '';
+    return '<h4>⚠️ Top 15 Unpaid Workers</h4><div class="tblwrap"><table><thead><tr><th>Code</th><th>Name</th><th>Department</th><th class="num">Unpaid</th></tr></thead><tbody>'
+    +list.map(w=>'<tr><td>'+w.code+'</td><td>'+w.name+'</td><td>'+w.dept+'</td><td class="num">'+F(w.unpaid)+'</td></tr>').join('')+'</tbody></table></div>'; }
+  return '';
+}
+const _doPrint=window.doPrint, _print=window.print.bind(window);
+window.doPrint=function(){
+  const cur=(typeof view!=="undefined")?view:""; const skip=SKIP[cur]||[]; const sel=getSel();
+  const avail=EXTRAS.filter(e=>!skip.includes(e[0])&&extraHTML(e[0])!=='');
+  if(!avail.length){ _doPrint(); return; }
+  const ov=document.createElement('div');
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:100000;display:flex;align-items:center;justify-content:center;padding:14px';
+  ov.innerHTML='<div style="background:#fff;color:#0f172a;border-radius:16px;max-width:430px;width:100%;padding:18px;max-height:88dvh;overflow:auto">'
+    +'<h3 style="margin:0 0 4px">🖨️ Print mein extra data?</h3>'
+    +'<p style="font-size:13px;opacity:.75;margin:0 0 10px">Report ke ilawa jo data print mein shamil karna hai us par tick rakhein — jo nahi chahiye, un-tick kar dein. Aap ki choice yaad rahe gi.</p>'
+    +avail.map(e=>'<label style="display:flex;gap:9px;align-items:center;padding:8px 6px;border:1px solid #e2e8f0;border-radius:10px;margin-bottom:7px;font-size:14px"><input type="checkbox" data-k="'+e[0]+'" '+(sel[e[0]]===false?'':'checked')+' style="width:18px;height:18px">'+e[1]+'</label>').join('')
+    +'<div style="display:flex;gap:8px;margin-top:12px"><button class="btn primary" id="poGo" style="flex:1">🖨️ Print karein</button><button class="btn ghost" id="poCancel">Cancel</button></div></div>';
+  document.body.appendChild(ov);
+  ov.querySelector('#poCancel').onclick=()=>ov.remove();
+  ov.querySelector('#poGo').onclick=()=>{
+    const chosen=[...ov.querySelectorAll('input[type=checkbox]')];
+    const ns=getSel(); chosen.forEach(c=>ns[c.dataset.k]=c.checked);
+    try{localStorage.setItem('salPrintExtras',JSON.stringify(ns));}catch(e){}
+    const add=chosen.filter(c=>c.checked).map(c=>extraHTML(c.dataset.k)).join('');
+    ov.remove();
+    let done=false;
+    window.print=function(){ if(done)return; done=true; window.print=_print;
+      if(add){ const pa=document.getElementById('printArea'); if(pa) pa.innerHTML+=add; } _print(); };
+    try{ _doPrint(); }finally{ setTimeout(()=>{ if(!done){ window.print=_print; } },600); }
+  };
+};
+})();
+</script>
 </html>
