@@ -3421,7 +3421,7 @@ if(typeof processFile==='function'){
   processFile=async function(f){
     try{
       const r=await _pf(f);
-      try{if(f&&f.name)saveFileInfo(f,pendingSrc||'Manual file');}catch(e){}
+      try{if(r!==false&&f&&f.name)saveFileInfo(f,pendingSrc||'Manual file');}catch(e){}
       return r;
     }finally{pendingSrc='';}
   };
@@ -3442,6 +3442,45 @@ renderBar();
   }else{
     status('📁 Folder connected hai: <b>'+(dirHandle.name||'')+'</b> — sync ke liye aik dafa ijazat chahiye (upar wala button ya Settings → Sync Now).');
     needBanner();
+  }
+})();
+/* ---------- Dark mode readability pack + modern hover + Settings full view (Saadi, 2026-10-29) ----------
+   Masla: kuch purane rang light theme ke liye hard-code thay — dark mode mein safed/cream background par
+   halka text nazar nahi ata tha (sidebar tabs hover, department dropdown, detail popup, file banner).
+   Yeh pack SIRF dark mode (html[data-theme="dark"]) par lagta hai; light mode bilkul nahi cherha. */
+(function(){
+  const st=document.createElement('style'); st.id='fsFixStyle';
+  st.textContent=
+  /* department dropdown: dark background + saaf safed text (open list bhi dark) */
+  'html[data-theme="dark"] #sideNav select{background:#0f172a!important;color:#f1f5f9!important;border-color:#334155!important}'
+  +'html[data-theme="dark"] select option{background:#0f172a;color:#f1f5f9}'
+  /* sidebar tabs: modern golden hover — gradient + kinare par gold line + halka slide, text pure safed */
+  +'html[data-theme="dark"] #sideNav .vtab{transition:background .18s ease,transform .18s ease,box-shadow .18s ease,color .18s ease,border-color .18s ease}'
+  +'html[data-theme="dark"] #sideNav .vtab:hover{background:linear-gradient(90deg,rgba(184,134,11,.30),rgba(184,134,11,.06))!important;border-color:rgba(184,134,11,.55)!important;color:#ffffff!important;box-shadow:inset 3px 0 0 #b8860b;transform:translateX(3px)}'
+  +'html.ur[data-theme="dark"] #sideNav .vtab:hover,body.ur[data-theme="dark"] #sideNav .vtab:hover{box-shadow:inset -3px 0 0 #b8860b;transform:translateX(-3px)}'
+  /* flat table ki row hover bhi dark mein parhne yog */
+  +'html[data-theme="dark"] #sheetTbl tr:hover td{background:rgba(184,134,11,.14)!important;color:#f8fafc!important}'
+  +'html[data-theme="dark"] details.dblock summary:hover{background:#263449!important}'
+  /* upar wale view tabs (pills) dark mein */
+  +'html[data-theme="dark"] .vtabs .vtab{background:#1e293b!important;color:#e5e7eb!important;border-color:#334155!important}'
+  +'html[data-theme="dark"] .vtabs .vtab.on{background:var(--brand)!important;color:#fff!important}'
+  /* detail popup (hero card / AI) — dark background, saaf text */
+  +'html[data-theme="dark"] #aiModal{background:#111827!important;color:#e5e7eb!important;border:1px solid #334155}'
+  +'html[data-theme="dark"] #aiMBody{color:#e5e7eb!important}'
+  +'html[data-theme="dark"] #aiMBody td{color:#e5e7eb!important;border-color:#334155!important}'
+  +'html[data-theme="dark"] #aiMBody th{background:#1e293b!important;color:#f8fafc!important;border-color:#334155!important}'
+  +'html[data-theme="dark"] #aiMTitle{color:#f8fafc!important}'
+  /* saved-sheet wala safed dabba (file banner) dark mein */
+  +'html[data-theme="dark"] #fileBanner{background:#0f172a!important;color:#e5e7eb!important;border-color:#334155!important}'
+  +'html[data-theme="dark"] .btn:hover{filter:brightness(1.09)}'
+  /* Settings khula ho to neeche wala dashboard/reports nahi dikhte — settings apni puri screen */
+  +'body.settings-open .wrap:not(#settingsPanel){display:none!important}';
+  document.head.appendChild(st);
+  const p=$('settingsPanel');
+  if(p){
+    const sync=()=>{const open=p.style.display!=='none';document.body.classList.toggle('settings-open',open);if(open)window.scrollTo(0,0);};
+    new MutationObserver(sync).observe(p,{attributes:true,attributeFilter:['style']});
+    sync();
   }
 })();
 window.SalFolder={syncNow: syncNow, connect: connect, remove: removeFolder};
