@@ -3154,6 +3154,15 @@ let dirHandle=null, busy=false, banner=null;
 const meta=()=>{try{return JSON.parse(localStorage.getItem(LS_META)||'null')}catch(e){return null}};
 const setMeta=m=>{try{if(m)localStorage.setItem(LS_META,JSON.stringify(m));else localStorage.removeItem(LS_META)}catch(e){}};
 const autoOn=()=>{try{return localStorage.getItem(LS_AUTO)!=='0'}catch(e){return true}};
+/* Folder/Archive load par app ka alert() popup nahi ayega — wajah status line mein likhi jayegi (refresh par popup wala masla, 2026-10-29) */
+let lastAlert='';
+async function quietLoad(f){
+  lastAlert='';
+  const _a=window.alert;
+  window.alert=m=>{if(!lastAlert)lastAlert=String(m||'');};
+  try{ return await processFile(f); }
+  finally{ window.alert=_a; }
+}
 /* ---------- Settings card ---------- */
 let stEl=null;
 const sp=$('settingsPanel');
@@ -3264,8 +3273,8 @@ async function arcPickChange(){
     try{fileHandle=null;}catch(e){}
     setMeta(null);   /* taake agli dafa main folder ki file lazmi dobara load ho */
     pendingSrc='📦 Archive: '+(arcHandle.name||'');
-    const ok=await processFile(f);
-    if(ok===false){status('⚠️ Archive file parhne mein masla: <b>'+name+'</b>');return;}
+    const ok=await quietLoad(f);
+    if(ok===false){status('⚠️ Archive file parhne mein masla: <b>'+name+'</b>'+(lastAlert?'<br>ℹ️ Wajah: '+lastAlert.replace(/</g,'&lt;'):''));return;}
     status('✅ Archive se load ho gayi — <b>'+name+'</b> (file time: '+new Date(f.lastModified).toLocaleString()+'). Is mahine par wapas ane ke liye <b>Sync Now</b> dabayein.');
   }catch(e){
     status('⚠️ Archive parhne mein masla — folder dobara jod kar dekhein.');
@@ -3305,8 +3314,8 @@ async function scanAndLoad(manual){
     if(typeof processFile!=='function'){status('⚠️ App loader tayyar nahi — dobara try karein.');return false;}
     try{fileHandle=null;}catch(e){}
     pendingSrc='📁 Folder: '+(dirHandle.name||'');
-    const ok=await processFile(f);
-    if(ok===false){status('⚠️ File parhne mein masla: <b>'+f.name+'</b> — folder mein salary sheet wali file rakhein.');return false;}
+    const ok=await quietLoad(f);
+    if(ok===false){status('⚠️ File parhne mein masla: <b>'+f.name+'</b>'+(lastAlert?'<br>ℹ️ Wajah: '+lastAlert.replace(/</g,'&lt;'):' — folder mein salary sheet wali file rakhein.'));return false;}
     setMeta({sig: sig, name: f.name, lm: f.lastModified, at: Date.now()});
     status('✅ Sync ho gaya — <b>'+f.name+'</b> (file time: '+new Date(f.lastModified).toLocaleString()+') · '+new Date().toLocaleTimeString()+' par load hua.'+(fellBack?'<br>ℹ️ Drop-down wali file (<b>'+pk+'</b>) folder mein nahi mili — sab se nayi file load kar di hai.':''));
     return true;
@@ -3634,6 +3643,238 @@ renderBar();
   window.SalDynamic={applyLayout: applyLayout, updSticky: updSticky};
 })();
 window.SalFolder={syncNow: syncNow, connect: connect, remove: removeFolder};
+})();
+
+/* ===== sal-v22 pack (2026-10-29): dark-mode FULL sweep fix + har table hover + print dark/light SAME
+   + 6 Mahina Compare + 7 Data Check + 8 Dept Summary Copy + 9 Sab ki Payslips + 10 Shortcuts + Dashboard Guide ===== */
+(function(){
+"use strict";
+const $=id=>document.getElementById(id);
+const esc2=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const LSG=(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}};
+const LSS=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
+
+/* ---------- CSS: dark sweep + hover + print ---------- */
+const st=document.createElement('style'); st.id='fsFixStyle2';
+st.textContent=
+'@media screen{'
++'table tbody tr:hover>td{background-color:rgba(var(--gold-rgb,184,134,11),.13)!important}'
++'html[data-theme="dark"] table tbody tr:hover>td{background-color:rgba(var(--gold-rgb,184,134,11),.22)!important}'
++'html[data-theme="dark"] .btn.ghost{background:#1e293b!important;color:#e5e7eb!important;border-color:#475569!important}'
++'html[data-theme="dark"] .pager button{background:#1e293b!important;color:#e5e7eb!important;border:1.5px solid #475569!important;border-radius:9px}'
++'html[data-theme="dark"] .pager button:disabled{opacity:.45}'
++'html[data-theme="dark"] .inschip{background:#3a2f10!important;color:#f5d98a!important;border-color:#8a6d1f!important}'
++'html[data-theme="dark"] .portion h4{color:#eec25e!important}'
++'html[data-theme="dark"] .pchip{background:#1e293b!important;color:#e5e7eb!important;border-color:#475569!important}'
++'html[data-theme="dark"] .pchip.v{background:#3a2f10!important;color:#f5d98a!important;border-color:#8a6d1f!important}'
++'html[data-theme="dark"] details.dblock summary{background:#1e293b!important;color:#e5e7eb!important}'
++'html[data-theme="dark"] tr.subhead td{background:#263449!important;color:#e5e7eb!important}'
++'html[data-theme="dark"] #view-sheets table{background:#fff!important}'
++'html[data-theme="dark"] #view-sheets td,html[data-theme="dark"] #view-sheets th{color:#0f172a!important}'
++['#f8fafc','#f1f5f9','#fff9e6','#fef9e7','#eef4ee','#eef2ff','#fdeeda','#ffffff'].map(c=>'html[data-theme="dark"] [style*="background:'+c+'"]:not(.slip):not(.slip *):not(#opBody):not(#opBody *):not(#view-sheets *):not(#fileBanner)').join(',')
++'{background:#1e293b!important;color:#e5e7eb!important}'
++['#f8fafc','#fff'].map(c=>'html[data-theme="dark"] [style*="background: '+c+'"]:not(.slip):not(.slip *):not(#opBody):not(#opBody *):not(#view-sheets *):not(#fileBanner)').join(',')
++'{background:#1e293b!important;color:#e5e7eb!important}'
++'}'
++'@media print{'
++'html[data-theme="dark"] #printArea,html[data-theme="dark"] #printArea *:not(img){color:#0f172a!important}'
++'html[data-theme="dark"] #printArea *:not(img){background:transparent!important}'
++'html[data-theme="dark"] #printArea th{background:#e2e8f0!important}'
++'html[data-theme="dark"] #printArea .slip{background:#fff!important}'
++'.bulkSlip .slip{page-break-after:always}'
++'}';
+document.head.appendChild(st);
+
+/* ---------- Dashboard cards: Data Check + Mahina Compare ---------- */
+function ensureCards(){
+  const fb=$('fileInfoBar'); if(!fb)return;
+  if(!$('chkCard')){
+    const chk=document.createElement('div'); chk.id='chkCard'; chk.className='card'; chk.style.margin='10px 0';
+    chk.innerHTML='<h3 style="margin:0">⚠️ Data Check</h3><p class="hint">Sheet load karne par ghaltiyan yahan khud nazar ayengi.</p>';
+    fb.after(chk);
+  }
+  if(!$('cmpCard')){
+    const cmp=document.createElement('div'); cmp.id='cmpCard'; cmp.className='card'; cmp.style.margin='10px 0';
+    cmp.innerHTML='<h3 style="margin:0 0 6px">📊 Mahina Compare</h3><div id="cmpBody"><p class="hint">Doosre mahine ki file load karne par compare yahan ayega.</p></div>';
+    $('chkCard').after(cmp);
+  }
+  if(!$('fsDeptBtn')){
+    const b=document.createElement('button'); b.className='btn gold'; b.id='fsDeptBtn'; b.textContent='📤 Dept Summary'; b.onclick=openDeptSummary;
+    const cp=$('fsCopyBtn'); if(cp&&cp.parentElement===fb&&cp.nextSibling)fb.insertBefore(b,cp.nextSibling); else fb.appendChild(b);
+  }
+}
+ensureCards();
+function scanData(){
+  const card=$('chkCard'); if(!card)return;
+  if(typeof W==='undefined'||!W.length){card.innerHTML='<h3 style="margin:0">⚠️ Data Check</h3><p class="hint">Sheet load karne par ghaltiyan yahan khud nazar ayengi.</p>';return;}
+  const issues=[];
+  const byCode={}; W.forEach(w=>{const c=String(w.code||'').trim(); if(c)(byCode[c]=byCode[c]||[]).push(w);});
+  const dups=Object.keys(byCode).filter(c=>byCode[c].length>1);
+  if(dups.length)issues.push({t:'🔁 Duplicate code',n:dups.length,items:dups.slice(0,8).map(c=>'Code '+c+' — '+byCode[c].length+' workers ('+byCode[c].slice(0,3).map(w=>w.name).join(', ')+')')});
+  const neg=W.filter(w=>w.net<0); if(neg.length)issues.push({t:'➖ Net negative',n:neg.length,items:neg.slice(0,8).map(w=>w.name+' ('+w.code+') — Net Rs '+fmt(w.net))});
+  const d31=W.filter(w=>w.days>31); if(d31.length)issues.push({t:'📅 Days 31 se zyada',n:d31.length,items:d31.slice(0,8).map(w=>w.name+' ('+w.code+') — '+w.days+' days')});
+  const miss=W.filter(w=>!String(w.name||'').trim()||!String(w.code||'').trim()); if(miss.length)issues.push({t:'❓ Naam ya code missing',n:miss.length,items:miss.slice(0,8).map(w=>(w.name||'(naam nahi)')+' / '+(w.code||'(code nahi)'))});
+  const over=W.filter(w=>w.paid>w.net+1); if(over.length)issues.push({t:'💸 Paid, Net se zyada',n:over.length,items:over.slice(0,8).map(w=>w.name+' ('+w.code+') — Paid Rs '+fmt(w.paid)+' > Net Rs '+fmt(w.net))});
+  if(!issues.length){card.innerHTML='<h3 style="margin:0">⚠️ Data Check</h3><p style="margin:6px 0 0;color:#059669;font-weight:700">✅ Koi ghalti nahi mili — '+W.length+' workers saaf hain.</p>';return;}
+  const tot=issues.reduce((a,i)=>a+i.n,0);
+  card.innerHTML='<h3 style="margin:0">⚠️ Data Check — '+tot+' masle mile</h3>'+issues.map(i=>'<details style="margin-top:6px"><summary style="cursor:pointer;font-weight:700">'+i.t+' ('+i.n+')</summary><ul style="margin:6px 0 2px 16px;padding:0">'+i.items.map(x=>'<li>'+esc2(x)+'</li>').join('')+(i.n>i.items.length?'<li>…aur '+(i.n-i.items.length)+' aur</li>':'')+'</ul></details>').join('');
+}
+function saveSnap(name){
+  try{
+    if(typeof W==='undefined'||!W.length)return;
+    const t=totals(W); const key=name||'Sheet';
+    const snaps=LSG('salSnapsV1',{});
+    snaps[key]={name:key,at:Date.now(),n:t.n,gross:t.gross,net:t.net,paid:t.paid,unpaid:t.unpaid};
+    const keep={}; Object.keys(snaps).sort((a,b)=>snaps[b].at-snaps[a].at).slice(0,12).forEach(k=>keep[k]=snaps[k]);
+    LSS('salSnapsV1',keep);
+  }catch(e){}
+}
+function renderCompare(){
+  const body=$('cmpBody'); if(!body)return;
+  if(typeof W==='undefined'||!W.length)return;
+  const snaps=LSG('salSnapsV1',{});
+  const curName=(LSG('salFileInfo',{})||{}).name||'';
+  const others=Object.keys(snaps).filter(k=>k!==curName);
+  if(!others.length){body.innerHTML='<p class="hint">Abhi sirf ek hi mahine ki file load hui hai. Koi doosri (purani) file load karein — phir dono ka compare yahan ayega.</p>';return;}
+  others.sort((a,b)=>snaps[b].at-snaps[a].at);
+  const pick0=LSG('salCmpPick',''); const pick=others.indexOf(pick0)>=0?pick0:others[0];
+  const t=totals(W), o=snaps[pick];
+  const row=(label,cv,ov,inv)=>{
+    const d=cv-ov, pct=ov?(d/Math.abs(ov)*100):0;
+    const good=inv?d<0:d>0, arrow=d>0?'▲':(d<0?'▼':'—'), col=d===0?'#64748b':(good?'#059669':'#dc2626');
+    return '<tr><td>'+label+'</td><td class="num">'+fmtM(cv)+'</td><td class="num">'+fmtM(ov)+'</td><td class="num" style="color:'+col+';font-weight:700">'+arrow+' '+fmtM(Math.abs(d))+' ('+(pct>=0?'+':'')+pct.toFixed(1)+'%)</td></tr>';
+  };
+  body.innerHTML='<label style="font-weight:600">Compare is file se: </label>'
+    +'<select id="cmpSel" style="padding:7px 10px;border:1.5px solid var(--line);border-radius:9px;max-width:100%">'
+    +others.map(k=>'<option '+(k===pick?'selected':'')+' value="'+esc2(k)+'">'+esc2(k)+'</option>').join('')+'</select>'
+    +'<div class="tblwrap" style="margin-top:8px"><table><thead><tr><th></th><th>Is file'+(curName?' ('+esc2(curName)+')':'')+'</th><th>'+esc2(pick)+'</th><th>Farq</th></tr></thead><tbody>'
+    +'<tr><td>👥 Workers</td><td class="num">'+fmt(t.n)+'</td><td class="num">'+fmt(o.n)+'</td><td class="num">'+(t.n-o.n>=0?'+':'')+fmt(t.n-o.n)+'</td></tr>'
+    +row('💼 Gross',t.gross,o.gross,false)+row('🧾 Net',t.net,o.net,false)+row('✅ Paid',t.paid,o.paid,false)+row('⏳ Unpaid',t.unpaid,o.unpaid,true)
+    +'</tbody></table></div>';
+  const s=$('cmpSel'); if(s)s.onchange=()=>{LSS('salCmpPick',s.value);renderCompare();};
+}
+if(typeof processFile==='function'){
+  const _pfv=processFile;
+  processFile=async function(f){ const r=await _pfv(f); if(r!==false){ try{ensureCards();}catch(e){} saveSnap(f&&f.name||''); try{scanData();}catch(e){} try{renderCompare();}catch(e){} } return r; };
+}
+let _sig='';
+setInterval(()=>{ try{
+  ensureCards();
+  if(typeof W==='undefined'||!W.length)return;
+  const fi=LSG('salFileInfo',{})||{};
+  const sig=W.length+'|'+(fi.name||'')+'|'+((W[0]&&W[0].code)||'');
+  if(sig!==_sig){ _sig=sig; scanData(); renderCompare(); }
+}catch(e){} },2000);
+window.SalChecks={run:scanData};
+window.SalCompare={render:renderCompare,snap:saveSnap};
+
+/* ---------- 8: Department-wise Summary Copy ---------- */
+function deptAgg(){
+  const by={};
+  (typeof W!=='undefined'?W:[]).forEach(w=>{const d=w.dept||'(no dept)'; (by[d]=by[d]||[]).push(w);});
+  return Object.keys(by).map(d=>({dept:d,t:totals(by[d])})).sort((a,b)=>b.t.net-a.t.net);
+}
+function deptText(x){
+  return '🏢 *'+x.dept+'* — Salary Summary\n👥 Workers: '+x.t.n+'\n💼 Gross: '+fmtM(x.t.gross)+'\n🧾 Net: '+fmtM(x.t.net)+'\n✅ Paid: '+fmtM(x.t.paid)+'\n⏳ Unpaid: '+fmtM(x.t.unpaid);
+}
+function openDeptSummary(){
+  if(typeof W==='undefined'||!W.length)return;
+  const rows=deptAgg();
+  window.__DEPT_SUMS__=rows.map(deptText);
+  const html='<p class="hint" style="margin-top:0">Har department ki alag summary — kisi ek ki Copy dabayein ya sab ek sath copy karein, phir WhatsApp par paste kar dein.</p>'
+    +'<p><button class="btn gold" data-dc="all">📋 Sab Copy karein ('+rows.length+' departments)</button></p>'
+    +'<div class="tblwrap"><table><thead><tr><th>Department</th><th>Workers</th><th>Gross</th><th>Net</th><th>Paid</th><th>Unpaid</th><th></th></tr></thead><tbody>'
+    +rows.map((x,i)=>'<tr><td>'+esc2(x.dept)+'</td><td class="num">'+fmt(x.t.n)+'</td><td class="num">'+fmtM(x.t.gross)+'</td><td class="num">'+fmtM(x.t.net)+'</td><td class="num">'+fmtM(x.t.paid)+'</td><td class="num">'+fmtM(x.t.unpaid)+'</td><td><button class="btn ghost" data-dc="'+i+'">📋 Copy</button></td></tr>').join('')
+    +'</tbody></table></div>';
+  const aoa=[['Department','Workers','Gross','Net','Paid','Unpaid']].concat(rows.map(x=>[x.dept,x.t.n,Math.round(x.t.gross),Math.round(x.t.net),Math.round(x.t.paid),Math.round(x.t.unpaid)]));
+  openDetail('📤 Department-wise Summary', html, aoa);
+}
+document.addEventListener('click',e=>{
+  const b=e.target&&e.target.closest?e.target.closest('[data-dc]'):null; if(!b)return;
+  const arr=window.__DEPT_SUMS__||[]; const i=b.getAttribute('data-dc');
+  const txt=i==='all'?arr.join('\n\n'):arr[+i];
+  if(txt==null)return;
+  try{navigator.clipboard.writeText(txt);}catch(_){}
+  const old=b.textContent; b.textContent='✅ Copied'; setTimeout(()=>{b.textContent=old;},1300);
+});
+window.SalDept={open:openDeptSummary};
+/* ---------- 9: Sab ki Payslips ek sath ---------- */
+function bulkSlips(){
+  if(typeof W==='undefined'||!W.length)return;
+  const sel=$('slipDept'); const dv=sel?sel.value:'';
+  const list=W.filter(w=>!dv||w.dept===dv);
+  if(!list.length)return;
+  if(list.length>150&&!confirm(list.length+' payslips print hongi — jaari rakhein?'))return;
+  const pa=$('printArea'); if(!pa)return;
+  pa.innerHTML=printHTML('Payslips — '+list.length+' workers','<div class="bulkSlip">'+list.map(w=>slipHTML(w)).join('')+'</div>');
+  setTimeout(()=>window.print(),60);
+}
+(function(){
+  const pv=$('view-payslip'); if(!pv||$('bulkSlipBtn'))return;
+  const anchor=$('slipSearch'); const row=anchor?anchor.parentElement:null; if(!row)return;
+  const b=document.createElement('button'); b.className='btn gold'; b.id='bulkSlipBtn'; b.textContent='🖨️ Sab ki Payslips'; b.onclick=bulkSlips;
+  row.appendChild(b);
+})();
+window.SalBulkSlips={run:bulkSlips};
+
+/* ---------- Print: detail list ka count theek (603 vs 448 wala confusion) ---------- */
+if(typeof printQDetail==='function'){
+  const _pq=printQDetail;
+  printQDetail=function(){
+    _pq();
+    try{
+      const pa=$('printArea'); if(!pa||typeof QD==='undefined'||!QD.html)return;
+      const m=String(QD.html).match(/Workers:\s*(?:<b>)?([\d,]+)/);
+      if(m&&m[1].replace(/,/g,'')!==String(W.length)){
+        pa.innerHTML=pa.innerHTML.replace(/Total employees: [\d,]+/,'Workers in this list: '+m[1]+' · Total employees: '+W.length);
+      }
+    }catch(e){}
+  };
+}
+
+/* ---------- 10: Keyboard Shortcuts ---------- */
+document.addEventListener('keydown',e=>{
+  const t=e.target;
+  const typing=t&&(t.tagName==='INPUT'||t.tagName==='TEXTAREA'||t.tagName==='SELECT'||t.isContentEditable);
+  if((e.ctrlKey||e.metaKey)&&(e.key==='s'||e.key==='S')){ e.preventDefault(); if(window.SalFolder)SalFolder.syncNow(); return; }
+  if(typing)return;
+  const pin=$('pinOv'); if(pin&&getComputedStyle(pin).display!=='none')return;
+  const modal=$('aiModal'); if(modal&&modal.classList.contains('open'))return;
+  if(e.key==='/'){ e.preventDefault(); const ds=$('deptSearch'); if(ds){ ds.scrollIntoView({block:'center'}); ds.focus(); } return; }
+  if(e.key==='?'){ e.preventDefault(); openGuide(); return; }
+  if(/^[1-9]$/.test(e.key)){
+    const tabs=[].slice.call(document.querySelectorAll('#sideNav .vtab'));
+    const b=tabs[parseInt(e.key,10)-1]; if(b)showView(b.dataset.view);
+  }
+});
+
+/* ---------- Dashboard Guide (Settings button: "Trip to Dashboard") ---------- */
+const GUIDE_HTML=
+'<p style="margin-top:0">Yeh guide har function ka asaan tareeqa batata hai. Yeh wala page <b>Print / PDF</b> bhi ho sakta hai — upar ke buttons se.</p>'
++'<h4>📂 1. Sheet load karna</h4><p>Upar <b>Open File</b> se salary sheet (.xlsx) chunein. Wahi file dobara parhni ho to <b>Refresh</b> wala button. File ka naam, modified time aur totals dashboard ke upar patti par nazar ate hain.</p>'
++'<h4>📁 2. Folder Sync (PC — Chrome/Edge)</h4><p><b>Settings → 📁 Folder Sync → Folder jodein</b> — woh folder chunein jahan salary sheet save hoti hai. Us ke baad app khulte hi us folder ki <b>sab se nayi</b> file khud load ho jayegi. Agar ghalat file uth jaye to Settings ke <b>drop-down</b> se sahi file chun lein (choice yaad rahegi) ya <b>Auto</b> par wapas kar dein. <b>🔄 Sync Now</b> = abhi isi waqt dobara check. Refresh par ab koi popup nahi ayega — file na khule to wajah Settings ki status line mein likhi ayegi.</p>'
++'<h4>📦 3. Archive Folder (purane mahine)</h4><p>Settings mein doosra (Archive) folder jod dein — purane mahine ki sheet wahan se khul jayegi. Is mahine par wapas ane ke liye <b>Sync Now</b> dabayein.</p>'
++'<h4>📌 4. Upar wali patti (Dashboard)</h4><p>File ka naam · modified time · file 2 din se purani ho to ⚠ warning. <b>📋 Summary Copy</b> = kul totals WhatsApp ke liye copy. <b>📤 Dept Summary</b> = har department ki alag summary copy/print.</p>'
++'<h4>🖨 5. Har report ke Print / PDF / Excel</h4><p>Har report ke upar teen buttons hain. <b>Print</b> aur <b>PDF</b> aik hi cheez hai — PDF ke liye printer wali list se <b>“Save as PDF”</b> chunein. <b>Excel</b> usi report ki Excel file download karta hai. Print har haal mein saaf siyah (black) ayega — dark mode ho ya light, print same rehta hai.</p>'
++'<h4>⚠️ 6. Data Check</h4><p>Dashboard par file load hote hi khud check hota hai: duplicate code, negative net, 31 se zyada days, naam/code missing, paid zyada — jo mile, list khul kar nazar ayega. Saaf ho to ✅ likha ayega.</p>'
++'<h4>📊 7. Mahina Compare</h4><p>Do mukhtalif mahinon ki files load karne par Dashboard par compare table banta hai — Gross / Net / Paid / Unpaid mein farq aur % khud likha ata hai. Drop-down se doosri file badal sakte hain.</p>'
++'<h4>🧾 8. Payslips</h4><p><b>Payslip</b> wali report mein ek worker ki slip — ya <b>🖨 Sab ki Payslips</b> se tamam (ya chune hue department ki) slips ek sath print/PDF. Department pehle upar wale drop-down se chun lein.</p>'
++'<h4>🌙 9. Dark / Light, 👁 Aasan Nazar, 🎨 Rang</h4><p>Upar 🌙/☀️ se theme badlein. <b>👁 Aasan Nazar</b> = font bara. <b>Settings → 🎨 Accent</b> se app ka rang (sona/neela/sabz waghera) badlein — print par is ka asar nahi hota.</p>'
++'<h4>📌 10. Sticky Totals Patti</h4><p>Neeche scroll karne par screen ke upar ek choti patti totals (Gross/Net/Paid/Unpaid) dikhati rehti hai — wapas upar jane ki zaroorat nahi.</p>'
++'<h4>🧩 11. Dashboard Layout</h4><p><b>Settings → 🧩 Dashboard Layout</b> — dashboard ke cards upar/neeche karna ya chupana, apni marzi ke mutabiq.</p>'
++'<h4>🔒 12. PIN Lock</h4><p><b>Settings → 🔒 App PIN</b> — PIN lagane par app khulne par aur 10 minute idle rehne par lock ho jata hai. PIN sirf usi device/browser ke liye hota hai.</p>'
++'<h4>🔍 13. Department Search</h4><p>Left side department wali list ke upar search — naam likhte hi list choti ho jati hai.</p>'
++'<h4>⌨️ 14. Keyboard Shortcuts</h4><p><b>Ctrl+S</b> = Folder Sync · <b>/</b> = Department search · <b>1–9</b> = pehli 9 reports · <b>?</b> = yeh Guide.</p>'
++'<h4>🤖 15. AI Assistant</h4><p>Neeche robot 🤖 wala gol button — sawal likhein (masalan “Total unpaid kitna hai?”), jawab aur detail wahan milegi.</p>';
+function openGuide(){ openDetail('📖 Dashboard Guide — konsa function, kaise use karein', GUIDE_HTML, null); }
+window.SalGuide={open:openGuide};
+(function(){
+  const sp=$('settingsPanel'); if(!sp||$('guideCard'))return;
+  const card=document.createElement('div'); card.className='card'; card.id='guideCard';
+  card.innerHTML='<h3>📖 Dashboard Guide</h3><p class="hint">Har function ka asaan guide — konsa button kya karta hai aur kaise use karna hai. Guide print/PDF bhi ho sakta hai.</p><div class="controls" style="margin-top:10px"><div class="ctl"><label>&nbsp;</label><button class="btn gold" id="guideBtn">📖 Trip to Dashboard — Guide kholein</button></div></div>';
+  sp.appendChild(card);
+  $('guideBtn').onclick=openGuide;
+})();
 })();
 </script>
 
